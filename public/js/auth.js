@@ -1,17 +1,20 @@
 // Auth utilities for A26 game
 // Supports two access modes:
-//   1. GUEST  — anyone can play with UNLIMITED trial coins. Guests can deal
-//               cards and watch the game, but the betting panel is locked.
-//               To place actual bets, they must register.
+//   1. GUEST  — anyone can play with a DEMO balance of ₹50,000. Guests CAN
+//               place bets to learn the game, but the balance is purely
+//               demonstrative: demo winnings are NOT credited as real money
+//               and the balance resets to ₹50,000 on each new visit (or when
+//               it runs low). To play for real money, register an account.
 //   2. PLAYER — registered user with a server-backed balance. Required for
-//               placing real bets. Login/register at /login.html.
+//               real-money play. Login/register at /login.html.
 const API_BASE = '';
 const GUEST_BALANCE_KEY = 'a26_guest_balance';
 const GUEST_NAME_KEY = 'a26_guest_name';
-// Guests have unlimited coins for "playing" (dealing, watching) — but the
-// betting panel is locked, so the balance is purely cosmetic. We store a
-// big sentinel so existing arithmetic in game.js still works if needed.
-const GUEST_BALANCE_SENTINEL = 999999999;
+// Guests start with ₹50,000 DEMO coins. They can place bets to understand
+// the game, but winnings are demo-only (never real money). If the demo
+// balance drops below the min bet, the game refills it back to this amount.
+const GUEST_DEMO_BALANCE = 50000;
+const GUEST_DEMO_MIN_REFILL = 2000;
 
 const Auth = {
   getToken() {
@@ -48,29 +51,48 @@ const Auth = {
     return !this.isLoggedIn();
   },
 
-  // Returns the guest balance. Always unlimited (the sentinel). We keep the
-  // localStorage entry for backward-compat with older clients.
+  // Returns the guest's current DEMO balance (persisted in localStorage so
+  // it survives page refreshes within the same browser session). Defaults
+  // to ₹50,000 on first visit. Clamped to a non-negative value.
   getGuestBalance() {
     let raw = localStorage.getItem(GUEST_BALANCE_KEY);
-    if (raw === null || isNaN(parseInt(raw, 10))) {
-      localStorage.setItem(GUEST_BALANCE_KEY, String(GUEST_BALANCE_SENTINEL));
+    let n = parseInt(raw, 10);
+    if (isNaN(n) || n < 0) {
+      n = GUEST_DEMO_BALANCE;
+      localStorage.setItem(GUEST_BALANCE_KEY, String(n));
     }
-    return GUEST_BALANCE_SENTINEL;
+    return n;
   },
 
+  // Persist the guest's demo balance. This IS used now — guests can bet and
+  // their demo balance goes up/down with wins/losses — but the value is
+  // purely local (never sent to the server, never real money).
   setGuestBalance(amount) {
-    // No-op for guests — their balance is always unlimited. Kept for
-    // backward-compat with code that calls this on every bet/clear.
-    return GUEST_BALANCE_SENTINEL;
+    const n = Math.max(0, parseInt(amount, 10) || 0);
+    localStorage.setItem(GUEST_BALANCE_KEY, String(n));
+    return n;
   },
 
+  // Refill the demo balance back to ₹50,000 when it runs low. Returns the
+  // new balance. Called by game.js when the guest can't afford the min bet.
   refillGuestBalance() {
-    return GUEST_BALANCE_SENTINEL;
+    const current = this.getGuestBalance();
+    if (current < GUEST_DEMO_MIN_REFILL) {
+      this.setGuestBalance(GUEST_DEMO_BALANCE);
+      return GUEST_DEMO_BALANCE;
+    }
+    return current;
   },
 
-  // Whether the guest balance should be shown as "∞" in the UI.
+  // Reset the demo balance to the starting amount (e.g. on explicit "reset
+  // demo" action — currently auto-triggered only via refill when low).
+  resetGuestBalance() {
+    this.setGuestBalance(GUEST_DEMO_BALANCE);
+    return GUEST_DEMO_BALANCE;
+  },
+
   isGuestBalanceUnlimited() {
-    return true;
+    return false; // guests now have a finite ₹50,000 demo balance
   },
 
   // Generate / retrieve a friendly guest display name like "Guest_3847"
@@ -118,9 +140,8 @@ const Auth = {
     return data;
   },
 
-  // Format a balance for display. Guests show "∞"; registered users show ₹X.
+  // Format a balance for display. Guests show ₹X (DEMO); registered users show ₹X.
   formatBalance(amount) {
-    if (this.isGuest()) return '\u221E'; // ∞
     return '\u20B9' + Number(amount || 0).toLocaleString('en-IN');
   },
 
@@ -159,13 +180,14 @@ const Auth = {
         navLogout.dataset.bound = '1';
       }
     } else {
-      // Guest nav — show "∞" balance and TRIAL badge
+      // Guest nav — show ₹50,000 DEMO balance and DEMO badge
       const guestName = this.getGuestName();
+      const demoBal = this.getGuestBalance();
       if (navUser) navUser.textContent = guestName;
-      if (navBalance) navBalance.textContent = '\u221E'; // ∞
+      if (navBalance) navBalance.textContent = '\u20B9' + demoBal.toLocaleString('en-IN');
       if (navModeBadge) {
         navModeBadge.style.display = '';
-        navModeBadge.textContent = 'TRIAL';
+        navModeBadge.textContent = 'DEMO';
         navModeBadge.classList.remove('real');
       }
       if (navLogout) navLogout.style.display = 'none';

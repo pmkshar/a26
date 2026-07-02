@@ -269,10 +269,10 @@ body::before {
 }
 
 .nav-brand-logo {
-  height: 38px;
+  height: 52px;
   width: auto;
   display: block;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55));
 }
 
 .nav-brand-fallback {
@@ -296,7 +296,7 @@ body::before {
 }
 
 @media (max-width: 600px) {
-  .nav-brand-logo { height: 30px; }
+  .nav-brand-logo { height: 40px; }
 }
 
 .nav-info {
@@ -367,14 +367,14 @@ body::before {
   .nav-login-cta  { padding: 5px 11px !important; font-size: 0.7rem !important; }
 }
 
-/* === NAV MODE BADGE (TRIAL / REAL) === */
+/* === NAV MODE BADGE (DEMO / REAL) === */
 .nav-mode-badge {
   font-size: 0.6rem;
   font-weight: 800;
   letter-spacing: 1px;
   padding: 3px 7px;
   border-radius: 4px;
-  background: linear-gradient(135deg, #c41e3a, #f0c674);
+  background: linear-gradient(135deg, #5b21b6, #a78bfa);
   color: #fff;
   text-shadow: 0 1px 2px rgba(0,0,0,0.4);
   border: 1px solid rgba(255,255,255,0.15);
@@ -384,9 +384,9 @@ body::before {
   background: linear-gradient(135deg, #1a6b3a, #2ecc71);
 }
 
-/* === TRIAL MODE BANNER === */
+/* === TRIAL MODE BANNER (now DEMO MODE) === */
 .trial-banner {
-  background: linear-gradient(90deg, rgba(196,30,58,0.85), rgba(212,168,67,0.85));
+  background: linear-gradient(90deg, rgba(91,33,182,0.92), rgba(212,168,67,0.85));
   border-bottom: 1px solid rgba(255,255,255,0.2);
   padding: 7px 14px;
   position: relative;
@@ -452,12 +452,13 @@ body::before {
 
 .header h1 {
   font-family: var(--font-display);
-  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  font-size: clamp(2.2rem, 6vw, 3.4rem);
   background: linear-gradient(180deg, var(--gold-light) 0%, var(--gold) 50%, var(--gold-dark) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
-  letter-spacing: 4px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.55)) drop-shadow(0 0 18px rgba(212,168,67,0.35));
+  letter-spacing: 5px;
+  font-weight: 900;
 }
 
 .header .subtitle {
@@ -2668,7 +2669,7 @@ body::before {
 /* === SPEECH BUBBLE === */
 .dh-bubble {
   position: absolute;
-  top: 6%;
+  top: 16%;
   left: 50%;
   transform: translateX(-50%) translateY(-10px);
   background: linear-gradient(135deg, rgba(20,8,2,0.92), rgba(40,20,8,0.92));
@@ -2785,9 +2786,11 @@ body::before {
 }
 
 /* === NAME PLATE === */
+/* Moved from bottom (where it overlapped the big timer) to top-center,
+   just below the LIVE/clock row. */
 .dh-name-plate {
   position: absolute;
-  bottom: 52px;
+  top: 38px;
   left: 50%;
   transform: translateX(-50%);
   background: linear-gradient(135deg, var(--gold-dark), var(--gold));
@@ -2809,11 +2812,11 @@ body::before {
 
 /* === Mobile responsive === */
 @media (max-width: 900px) {
-  .dh-bubble { font-size: 0.72rem; padding: 6px 12px; max-width: 92%; top: 4%; }
+  .dh-bubble { font-size: 0.72rem; padding: 6px 12px; max-width: 92%; top: 14%; }
   .dh-emotion-indicator { font-size: 0.55rem; padding: 1px 6px; top: 32px; left: 6px; }
   .dh-voice-toggle { width: 26px; height: 26px; top: 32px; right: 6px; }
   .dh-voice-toggle svg { width: 14px; height: 14px; }
-  .dh-name-plate { font-size: 0.62rem; padding: 3px 10px; bottom: 48px; }
+  .dh-name-plate { font-size: 0.62rem; padding: 3px 10px; top: 34px; }
   /* Face overlays scale with the smaller video pane */
   .dh-mouth   { width: 44px; top: 46%; }
   .dh-eye-lid { width: 26px; height: 12px; top: 32%; }
@@ -2828,7 +2831,7 @@ body::before {
   .dh-bubble { font-size: 0.65rem; padding: 4px 10px; }
   .dh-emotion-indicator { display: none; }
   .dh-voice-toggle { width: 24px; height: 24px; top: 30px; right: 4px; }
-  .dh-name-plate { font-size: 0.55rem; bottom: 44px; padding: 2px 8px; }
+  .dh-name-plate { font-size: 0.55rem; top: 30px; padding: 2px 8px; }
   .dh-img { max-width: 130%; }
   .dh-mouth   { width: 36px; top: 46%; }
   .dh-eye-lid { width: 22px; height: 10px; }

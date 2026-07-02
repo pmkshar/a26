@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="/images/a26-logo.svg">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=dh13">
+<link rel="stylesheet" href="/css/style.css?v=dh14">
 </head>
 <body>
 
@@ -27,7 +27,7 @@
   <div class="nav-info">
     <span class="nav-user" id="nav-user"></span>
     <span class="nav-balance" id="nav-balance">₹0</span>
-    <span class="nav-mode-badge" id="navModeBadge" style="display:none;">TRIAL</span>
+    <span class="nav-mode-badge" id="navModeBadge" style="display:none;">DEMO</span>
     <div class="nav-links">
       <a href="#" id="nav-howto" class="nav-howto-link">How to Play</a>
       <a href="/dashboard.html" class="hide-mobile" id="nav-dashboard" style="display:none;">Dashboard</a>
@@ -38,14 +38,13 @@
   </div>
 </div>
 
-<!-- GUEST / TRIAL MODE BANNER (shown only for guests) -->
+<!-- GUEST / DEMO MODE BANNER (shown only for guests) -->
 <div class="trial-banner" id="trialBanner" style="display:none;">
   <div class="trial-banner-inner">
     <div class="trial-banner-text">
-      <strong>TRIAL MODE</strong> · You're playing with unlimited sample coins — explore the game freely.
-      To place real bets, register a free account.
+      <strong>DEMO MODE</strong> · You're playing with a ₹50,000 sample balance. Place bets to learn the game — demo winnings are <strong>not real money</strong>.
     </div>
-    <a href="/login.html" class="trial-banner-btn">Register to Bet →</a>
+    <a href="/login.html" class="trial-banner-btn">Register to Play for Real →</a>
   </div>
 </div>
 
@@ -172,14 +171,9 @@
         <button class="btn-deal" id="btnDeal" disabled>DEAL</button>
       </div>
 
-      <!-- GUEST LOCK OVERLAY (covers the betting panel for guests) -->
-      <div class="betting-lock-overlay" id="bettingLockOverlay">
-        <div class="lock-icon">🔒</div>
-        <div class="lock-title">Register to Place Bets</div>
-        <div class="lock-sub">Guests can play and watch the game freely with unlimited coins, but placing real bets requires a free account.</div>
-        <a href="/login.html" class="lock-cta">Register / Login →</a>
-        <button class="lock-just-watch" id="btnJustWatch">Just watch this round</button>
-      </div>
+      <!-- The old betting-lock overlay has been removed — guests now bet
+           freely with their ₹50,000 DEMO balance. The DEMO badge in the
+           nav and the DEMO MODE banner above make the demo status clear. -->
     </div>
 
     <!-- BALANCE BAR -->
@@ -247,13 +241,13 @@
     <tr><td>3 Matches</td><td>1 : 4</td></tr>
   </table>
   <p><strong>Example:</strong> Bet ₹2,000 on house "A". If 1 of the 3 cards is an Ace, you win ₹4,000 (1:1). If 2 are Aces, you win ₹6,000 (1:2). If all 3 are Aces, you win ₹8,000 (1:4).</p>
-  <p><strong>Guests:</strong> Play the trial freely with unlimited coins. To place real bets, register a free account.</p>
+  <p><strong>Guests:</strong> Get a ₹50,000 DEMO balance to learn the game. You CAN place demo bets, but demo winnings are <strong>not real money</strong>. Register a free account to play for real.</p>
 </div>
 
-<script src="/js/auth.js?v=dh13"></script>
-<script src="/js/digital-human.js?v=dh13"></script>
-<script src="/js/live-activity.js?v=dh13"></script>
-<script src="/js/game.js?v=dh13"></script>
+<script src="/js/auth.js?v=dh14"></script>
+<script src="/js/digital-human.js?v=dh14"></script>
+<script src="/js/live-activity.js?v=dh14"></script>
+<script src="/js/game.js?v=dh14"></script>
 <script>
 // PWA service worker registration
 if ('serviceWorker' in navigator) {

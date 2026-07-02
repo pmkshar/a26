@@ -1,7 +1,7 @@
 // A26 Service Worker - PWA offline support
 // Strategy: network-first for HTML/JS/CSS (so users always get latest),
 //           cache-first for images/icons (they rarely change).
-const CACHE_NAME = 'a26-v14-deck-a6-cards';
+const CACHE_NAME = 'a26-v15-demo-balance';
 const PRECACHE_ASSETS = [
   '/',
   '/login.html',
