@@ -221,46 +221,48 @@ app.get('/api/player/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
-// Place bet
+// Place bet / Record round result (baccarat settles client-side for snappy UX)
 app.post('/api/player/bet', authenticateToken, async (req, res) => {
   try {
-    const { roundId, house, amount } = req.body;
+    const { roundId, house, amount, betType, result, winnings, finalBalance } = req.body;
 
-    if (!roundId || !house || !amount) {
-      return res.status(400).json({ error: 'Round ID, house, and amount required' });
-    }
-
-    if (amount < 2000 || amount > 60000) {
-      return res.status(400).json({ error: 'Bet must be between ₹2,000 and ₹60,000' });
+    if (!roundId) {
+      return res.status(400).json({ error: 'Round ID required' });
     }
 
     const data = await loadData();
     const user = data.users.find(u => u.id === req.user.id);
 
-    if (user.balance < amount) {
-      return res.status(400).json({ error: 'Insufficient balance' });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    user.balance -= amount;
-
+    // Record the bet/round outcome
     const bet = {
-      id: 'bet_' + Date.now(),
+      id: 'bet_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
       playerId: req.user.id,
       roundId,
-      house,
-      amount,
-      winnings: 0,
-      status: 'pending',
+      house: house || betType || (result || 'unknown'),
+      amount: amount || 0,
+      winnings: winnings || 0,
+      result: result || null,
+      status: 'completed',
       createdAt: new Date().toISOString()
     };
 
     data.bets.push(bet);
+
+    // Sync user balance to client-reported value (client is source of truth for live game)
+    if (typeof finalBalance === 'number' && finalBalance >= 0) {
+      user.balance = finalBalance;
+    }
+
     await saveData(data);
 
     res.json({ bet, newBalance: user.balance });
   } catch (error) {
     console.error('Bet error:', error);
-    res.status(500).json({ error: 'Failed to place bet' });
+    res.status(500).json({ error: 'Failed to record bet' });
   }
 });
 

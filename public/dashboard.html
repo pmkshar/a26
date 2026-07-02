@@ -70,7 +70,7 @@
 
   <!-- PLAY BUTTON -->
   <div style="text-align: center; margin-top: 30px;">
-    <a href="/index.html" class="btn btn-primary" style="display: inline-block; text-decoration: none; padding: 15px 40px; font-size: 1.1rem;">Play Now</a>
+    <a href="/index.html" class="btn btn-primary" style="display: inline-block; text-decoration: none; padding: 15px 40px; font-size: 1.1rem;">Enter Live Table</a>
   </div>
 </div>
 
@@ -107,16 +107,16 @@ async function loadDashboard() {
           <thead>
             <tr>
               <th>Round</th>
-              <th>House</th>
-              <th>Bet</th>
               <th>Result</th>
+              <th>Stake</th>
+              <th>Outcome</th>
             </tr>
           </thead>
           <tbody>
             ${data.recentBets.map(bet => `
               <tr>
-                <td>#${bet.roundId.slice(-6)}</td>
-                <td>${bet.house}</td>
+                <td>#${bet.roundId.replace('round_','').slice(-6)}</td>
+                <td>${bet.result ? bet.result.toUpperCase() : bet.house}</td>
                 <td>₹${bet.amount.toLocaleString('en-IN')}</td>
                 <td>
                   <span class="badge ${bet.winnings > 0 ? 'badge-win' : 'badge-lose'}">

@@ -1,109 +1,246 @@
-// A26 Game Logic - Connected to Backend API
+// =========================================================
+// A26 SPEED BACCARAT - Live Dealer Edition
+// =========================================================
 
-// Check auth
 Auth.requireAuth();
+Auth.updateNav();
 
-// === GAME STATE ===
-const HOUSES = ['A', '2', '3', '4', '5', '6'];
-const CARD_VALUES = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+// === CONSTANTS ===
 const SUITS = [
-  { sym: '♠', color: 'black' },
-  { sym: '♥', color: 'red' },
-  { sym: '♦', color: 'red' },
-  { sym: '♣', color: 'black' }
+  { sym: '\u2660', color: 'black' }, // spade
+  { sym: '\u2665', color: 'red' },   // heart
+  { sym: '\u2666', color: 'red' },   // diamond
+  { sym: '\u2663', color: 'black' }  // club
 ];
+const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const PAYOUTS = {
+  player: 1,
+  banker: 0.95,
+  tie: 8,
+  playerPair: 11,
+  bankerPair: 11
+};
+const BET_LABELS = {
+  player: 'PLAYER',
+  banker: 'BANKER',
+  tie: 'TIE',
+  playerPair: 'P PAIR',
+  bankerPair: 'B PAIR'
+};
+const BET_WINDOW_MS = 12000; // 12 second speed baccarat betting window
 
+// === STATE ===
 let balance = 0;
-let bets = {};
+let bets = {};          // { player: 5000, banker: 0, ... }
+let totalBet = 0;
 let round = 1;
 let history = [];
 let isDealing = false;
-let currentRoundId = null;
+let isBettingOpen = true;
+let selectedChip = 2000;
+let currentDealer = 1;
+let betTimerInterval = null;
+let betWindowStart = 0;
+let lastWin = 0;
+let videoClockInterval = null;
 
 // === INIT ===
 document.addEventListener('DOMContentLoaded', async () => {
-  Auth.updateNav();
-  
-  // Load user balance
   const user = Auth.getUser();
   if (user) {
     balance = user.balance || 0;
-    updateUI();
   }
-  
-  initHouses();
-  setupQuickBets();
-  
-  // Create initial round
-  try {
-    const data = await Auth.api('/api/admin/rounds', { method: 'POST' });
-    currentRoundId = data.round.id;
-  } catch (err) {
-    // If not admin, we'll create rounds client-side for now
-    console.log('Round creation requires admin');
-  }
+  updateBalanceUI();
+
+  initChips();
+  initBetTiles();
+  initDealerSwitch();
+  startVideoClock();
+  initScoreboard();
+
+  // Begin first betting window
+  startBettingWindow();
 });
 
-// === INIT HOUSES ===
-function initHouses() {
-  const grid = document.getElementById('housesGrid');
-  grid.innerHTML = '';
-  HOUSES.forEach(h => {
-    const div = document.createElement('div');
-    div.className = 'house';
-    div.dataset.house = h;
-    div.innerHTML = `
-      <div class="house-label">${h}</div>
-      <div class="house-dots">${'<div class="house-dot"></div>'.repeat(6)}</div>
-      <div class="house-bets" id="bets-${h}"></div>
-    `;
-    div.addEventListener('click', () => selectHouse(h));
-    grid.appendChild(div);
-  });
+// === VIDEO CLOCK (decorative, runs always) ===
+function startVideoClock() {
+  const clockEl = document.getElementById('videoClock');
+  const sessionStart = Date.now();
+  videoClockInterval = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - sessionStart) / 1000);
+    const h = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+    const m = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+    const s = String(elapsed % 60).padStart(2, '0');
+    clockEl.textContent = `${h}:${m}:${s}`;
+  }, 1000);
 }
 
-function setupQuickBets() {
-  document.querySelectorAll('.quick-bet').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.getElementById('betInput').value = btn.dataset.amount;
-      updateDealButton();
+// === SCOREBOARD (P/B/T bead plate) ===
+function initScoreboard() {
+  const sb = document.getElementById('scoreboard');
+  sb.innerHTML = '<div class="scoreboard-empty">No rounds yet</div>';
+}
+
+function updateScoreboard() {
+  const sb = document.getElementById('scoreboard');
+  if (history.length === 0) {
+    sb.innerHTML = '<div class="scoreboard-empty">No rounds yet</div>';
+    return;
+  }
+  const last = history.slice(0, 20);
+  sb.innerHTML = last.map(h => {
+    let cls = 'bead-tie';
+    let lbl = 'T';
+    if (h.winner === 'player') { cls = 'bead-player'; lbl = 'P'; }
+    else if (h.winner === 'banker') { cls = 'bead-banker'; lbl = 'B'; }
+    return `<div class="bead ${cls}">${lbl}</div>`;
+  }).join('');
+}
+
+// === CHIP SELECTOR ===
+function initChips() {
+  document.querySelectorAll('.chip').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(x => x.classList.remove('selected'));
+      c.classList.add('selected');
+      selectedChip = parseInt(c.dataset.value);
     });
   });
-  document.getElementById('betInput').addEventListener('input', updateDealButton);
+  // Default selection
+  document.querySelector('.chip-5000').classList.add('selected');
+  selectedChip = 5000;
 }
 
-// === SELECT HOUSE ===
-function selectHouse(house) {
-  if (isDealing) return;
-  document.querySelectorAll('.house').forEach(el => {
-    if (el.dataset.house === house) el.classList.toggle('selected');
+// === BET TILES ===
+function initBetTiles() {
+  document.querySelectorAll('.bet-tile').forEach(tile => {
+    tile.addEventListener('click', () => {
+      if (!isBettingOpen || isDealing) return;
+      const bet = tile.dataset.bet;
+      placeBet(bet, selectedChip);
+    });
   });
-  const selected = document.querySelectorAll('.house.selected');
-  if (selected.length === 1) {
-    document.getElementById('selectedHouseDisplay').textContent = 'House: ' + selected[0].dataset.house;
-  } else if (selected.length > 1) {
-    document.getElementById('selectedHouseDisplay').textContent = selected.length + ' houses selected';
-  } else {
-    document.getElementById('selectedHouseDisplay').textContent = 'Select a house';
+
+  document.getElementById('btnClear').addEventListener('click', clearBets);
+  document.getElementById('btnDeal').addEventListener('click', dealNow);
+}
+
+// === DEALER SWITCH ===
+function initDealerSwitch() {
+  document.querySelectorAll('.dealer-pill').forEach(p => {
+    p.addEventListener('click', () => {
+      if (isDealing) return;
+      document.querySelectorAll('.dealer-pill').forEach(x => x.classList.remove('active'));
+      p.classList.add('active');
+      currentDealer = parseInt(p.dataset.dealer);
+      setDealerPose('idle');
+    });
+  });
+}
+
+function setDealerPose(pose) {
+  const img = document.getElementById('dealerFrame');
+  img.src = `/images/dealers/dealer${currentDealer}_${pose}.png`;
+  img.dataset.current = pose;
+}
+
+function setDealerBubble(text) {
+  document.getElementById('dealerBubble').textContent = text;
+}
+
+// === PLACE / CLEAR BETS ===
+function placeBet(bet, amount) {
+  if (balance < amount) {
+    flashMessage('Insufficient balance');
+    return;
   }
+  bets[bet] = (bets[bet] || 0) + amount;
+  balance -= amount;
+  totalBet += amount;
+  updateBalanceUI();
+  renderChipsOnTile(bet);
+  updateDealButton();
+  // Subtle pulse on bet tile
+  const tile = document.querySelector(`.bet-tile[data-bet="${bet}"]`);
+  tile.classList.add('pulse');
+  setTimeout(() => tile.classList.remove('pulse'), 400);
+}
+
+function renderChipsOnTile(bet) {
+  const el = document.getElementById('chips-' + bet);
+  if (!bets[bet]) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `<span class="chip-stack">₹${bets[bet].toLocaleString('en-IN')}</span>`;
+}
+
+function clearBets() {
+  if (isDealing || !isBettingOpen) return;
+  // Refund all bets
+  balance += totalBet;
+  totalBet = 0;
+  bets = {};
+  document.querySelectorAll('.bet-tile-chips').forEach(el => el.innerHTML = '');
+  updateBalanceUI();
   updateDealButton();
 }
 
 function updateDealButton() {
-  const amount = parseInt(document.getElementById('betInput').value) || 0;
-  const selected = document.querySelectorAll('.house.selected');
-  const canDeal = selected.length > 0 && amount >= 2000 && amount <= 60000;
-  document.getElementById('btnDeal').disabled = !canDeal;
+  const btn = document.getElementById('btnDeal');
+  btn.disabled = isDealing || totalBet === 0 || !isBettingOpen;
 }
 
-// === CREATE DECK ===
+function updateBalanceUI() {
+  document.getElementById('balance').textContent = '\u20B9' + balance.toLocaleString('en-IN');
+  document.getElementById('totalBet').textContent = '\u20B9' + totalBet.toLocaleString('en-IN');
+  document.getElementById('lastWin').textContent = '\u20B9' + lastWin.toLocaleString('en-IN');
+  document.getElementById('nav-balance').textContent = '\u20B9' + balance.toLocaleString('en-IN');
+  document.getElementById('roundNum').textContent = round;
+}
+
+// === BETTING WINDOW TIMER ===
+function startBettingWindow() {
+  isBettingOpen = true;
+  betWindowStart = Date.now();
+  setDealerPose('idle');
+  setDealerBubble('Place your bets');
+  updateDealButton();
+  document.getElementById('betTimer').textContent = '12';
+
+  betTimerInterval = setInterval(() => {
+    const elapsed = Date.now() - betWindowStart;
+    const remaining = Math.max(0, Math.ceil((BET_WINDOW_MS - elapsed) / 1000));
+    document.getElementById('betTimer').textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(betTimerInterval);
+      // Auto-deal if any bets placed
+      if (totalBet > 0) {
+        dealNow();
+      } else {
+        // Restart betting window if no bets
+        startBettingWindow();
+      }
+    }
+  }, 250);
+}
+
+function stopBettingWindow() {
+  isBettingOpen = false;
+  if (betTimerInterval) clearInterval(betTimerInterval);
+  document.getElementById('betTimer').textContent = '0';
+  updateDealButton();
+}
+
+// === DECK & CARD LOGIC ===
 function createDeck() {
   const deck = [];
-  CARD_VALUES.forEach(val => {
-    SUITS.forEach(suit => {
-      deck.push({ value: val, suit: suit.sym, color: suit.color });
+  RANKS.forEach(r => {
+    SUITS.forEach(s => {
+      deck.push({ rank: r, suit: s.sym, color: s.color });
     });
   });
+  // Shuffle (Fisher-Yates)
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -111,203 +248,384 @@ function createDeck() {
   return deck;
 }
 
-// === DEAL CARDS ===
-async function dealCards() {
-  if (isDealing) return;
-  
-  const amount = parseInt(document.getElementById('betInput').value) || 0;
-  if (amount < 2000 || amount > 60000) {
-    alert('Bet must be between ₹2,000 and ₹60,000');
-    return;
+function cardValue(card) {
+  if (card.rank === 'A') return 1;
+  if (['10','J','Q','K'].includes(card.rank)) return 0;
+  return parseInt(card.rank);
+}
+
+function handTotal(cards) {
+  const sum = cards.reduce((a, c) => a + cardValue(c), 0);
+  return sum % 10;
+}
+
+// === BACCARAT THIRD-CARD RULES ===
+function determineDraw(playerCards, bankerCards) {
+  const pTotal = handTotal(playerCards);
+  const bTotal = handTotal(bankerCards);
+
+  // Natural - no more cards
+  if (pTotal >= 8 || bTotal >= 8) {
+    return { playerDraws: false, bankerDraws: false, playerThird: null, natural: true };
   }
-  
-  const selected = document.querySelectorAll('.house.selected');
-  if (selected.length === 0) {
-    alert('Please select at least one house');
-    return;
+
+  let playerDraws = false;
+  let playerThird = null;
+
+  // Player rule: stands on 6-7, draws on 0-5
+  if (pTotal <= 5) {
+    playerDraws = true;
   }
-  
-  const totalNeeded = amount * selected.length;
-  if (totalNeeded > balance) {
-    alert('Insufficient balance! You need ₹' + totalNeeded.toLocaleString('en-IN'));
-    return;
+
+  let bankerDraws = false;
+  if (playerDraws) {
+    // Player drew a third card
+    // Banker rules based on player's third card value
+    if (bTotal <= 5) {
+      bankerDraws = true;
+    }
+    // More granular rules:
+    if (bTotal === 6) {
+      // Banker draws only if player's third is 6 or 7
+      // (handled by drawing first below)
+    }
+  } else {
+    // Player stood (6 or 7)
+    if (bTotal <= 5) bankerDraws = true;
   }
-  
+
+  return { playerDraws, bankerDraws, playerThird, natural: false };
+}
+
+// Standard baccarat third-card rules (full implementation)
+function applyThirdCardRules(playerCards, bankerCards, deck) {
+  const pTotal = handTotal(playerCards);
+  const bTotal = handTotal(bankerCards);
+
+  const result = {
+    playerThird: null,
+    bankerThird: null,
+    natural: false
+  };
+
+  // Natural - both stand
+  if (pTotal >= 8 || bTotal >= 8) {
+    result.natural = true;
+    return result;
+  }
+
+  // Player rule
+  let playerDrew = false;
+  if (pTotal <= 5) {
+    result.playerThird = deck.pop();
+    playerCards.push(result.playerThird);
+    playerDrew = true;
+  }
+
+  // Banker rule
+  const p3 = result.playerThird ? cardValue(result.playerThird) : null;
+  let bankerDraws = false;
+
+  if (!playerDrew) {
+    // Player stood on 6 or 7
+    if (bTotal <= 5) bankerDraws = true;
+  } else {
+    // Player drew - complex banker rules
+    if (bTotal <= 2) bankerDraws = true;
+    else if (bTotal === 3) bankerDraws = (p3 !== 8);
+    else if (bTotal === 4) bankerDraws = (p3 >= 2 && p3 <= 7);
+    else if (bTotal === 5) bankerDraws = (p3 >= 4 && p3 <= 7);
+    else if (bTotal === 6) bankerDraws = (p3 === 6 || p3 === 7);
+    // bTotal 7: stands
+  }
+
+  if (bankerDraws) {
+    result.bankerThird = deck.pop();
+    bankerCards.push(result.bankerThird);
+  }
+
+  return result;
+}
+
+// === PAYOUT CALCULATION ===
+function calculatePayout(playerCards, bankerCards, bets) {
+  const pTotal = handTotal(playerCards);
+  const bTotal = handTotal(bankerCards);
+  let winner;
+  if (pTotal > bTotal) winner = 'player';
+  else if (bTotal > pTotal) winner = 'banker';
+  else winner = 'tie';
+
+  // Pairs: first 2 cards same rank
+  const playerPair = playerCards[0].rank === playerCards[1].rank;
+  const bankerPair = bankerCards[0].rank === bankerCards[1].rank;
+
+  let totalWin = 0;
+  const breakdown = {};
+
+  Object.entries(bets).forEach(([bet, amount]) => {
+    let win = 0;
+    if (bet === 'player' && winner === 'player') {
+      win = amount + amount * PAYOUTS.player;
+    } else if (bet === 'banker' && winner === 'banker') {
+      win = amount + amount * PAYOUTS.banker;
+    } else if (bet === 'tie' && winner === 'tie') {
+      // Tie bet pays 8:1; player/banker bets push (returned)
+      win = amount + amount * PAYOUTS.tie;
+    } else if (bet === 'playerPair' && playerPair) {
+      win = amount + amount * PAYOUTS.playerPair;
+    } else if (bet === 'bankerPair' && bankerPair) {
+      win = amount + amount * PAYOUTS.bankerPair;
+    } else if ((bet === 'player' || bet === 'banker') && winner === 'tie') {
+      // Push - return stake
+      win = amount;
+    } else {
+      win = 0;
+    }
+    breakdown[bet] = win;
+    totalWin += win;
+  });
+
+  return { winner, playerPair, bankerPair, totalWin, breakdown, pTotal, bTotal };
+}
+
+// === DEAL NOW ===
+async function dealNow() {
+  if (isDealing || totalBet === 0) return;
   isDealing = true;
+  stopBettingWindow();
   document.getElementById('btnDeal').disabled = true;
   document.getElementById('btnClear').disabled = true;
 
-  const statusEl = document.getElementById('dealerStatus');
-  statusEl.textContent = 'Shuffling...';
+  // Clear previous hand visuals
+  document.getElementById('playerCards').innerHTML = '';
+  document.getElementById('bankerCards').innerHTML = '';
+  document.getElementById('playerScore').textContent = '0';
+  document.getElementById('bankerScore').textContent = '0';
+  document.getElementById('resultBanner').textContent = '';
+  document.getElementById('resultBanner').className = 'result-banner';
+  document.getElementById('handPlayer').classList.remove('hand-winner');
+  document.getElementById('handBanker').classList.remove('hand-winner');
 
-  // Place bets client-side (for demo)
-  bets = {};
-  let total = 0;
-  selected.forEach(el => {
-    const h = el.dataset.house;
-    bets[h] = amount;
-    total += amount;
-  });
-  balance -= total;
-  updateUI();
-  
-  selected.forEach(el => {
-    const h = el.dataset.house;
-    document.getElementById('bets-' + h).innerHTML = `<span class="bet-chip">₹${bets[h].toLocaleString('en-IN')}</span>`;
-  });
+  // === ANIMATION SEQUENCE ===
+  // 1. Dealer cuts the deck (animation)
+  setDealerBubble('Cutting the deck');
+  setDealerPose('cutting');
+  animateDeckShuffle();
+  await delay(900);
 
-  // Reset cards
-  for (let i = 1; i <= 3; i++) {
-    const slot = document.getElementById('card' + i);
-    slot.classList.remove('revealed', 'match');
-    slot.querySelector('.card-back').style.display = '';
-    slot.querySelector('.card-face').style.display = 'none';
-  }
-
-  // Create and pick cards
+  // 2. Build deck and "burn" top card (visual flourish)
   const deck = createDeck();
-  const drawn = [deck[0], deck[1], deck[2]];
+  deck.pop(); // burn
 
-  await delay(800);
-  statusEl.textContent = 'Drawing cards...';
+  // 3. Deal cards alternately: P, B, P, B (+ optional third cards)
+  const playerCards = [];
+  const bankerCards = [];
+  await dealSequence(deck, playerCards, bankerCards);
+}
 
-  for (let i = 0; i < 3; i++) {
-    const slot = document.getElementById('card' + (i + 1));
-    slot.classList.add('revealed');
-    const card = drawn[i];
-    slot.querySelector('.card-face').style.display = 'flex';
-    slot.querySelector('.card-back').style.display = 'none';
-    const valEl = slot.querySelector('.card-value');
-    const suitEl = slot.querySelector('.card-suit');
-    valEl.textContent = card.value;
-    valEl.className = 'card-value ' + card.color;
-    suitEl.textContent = card.suit;
-    suitEl.style.color = card.color === 'red' ? '#c41e3a' : '#1a1a1a';
-    await delay(500);
+async function dealSequence(deck, playerCards, bankerCards) {
+  setDealerPose('dealing');
+  setDealerBubble('Dealing cards');
+
+  // Player 1
+  let c = deck.pop();
+  playerCards.push(c);
+  await renderCard(c, 'playerCards');
+  await delay(350);
+
+  // Banker 1
+  c = deck.pop();
+  bankerCards.push(c);
+  await renderCard(c, 'bankerCards');
+  await delay(350);
+
+  // Player 2
+  c = deck.pop();
+  playerCards.push(c);
+  await renderCard(c, 'playerCards');
+  await delay(350);
+
+  // Banker 2
+  c = deck.pop();
+  bankerCards.push(c);
+  await renderCard(c, 'bankerCards');
+  await delay(400);
+
+  updateScore('player', playerCards);
+  updateScore('banker', bankerCards);
+
+  // Check for naturals
+  const pTotal = handTotal(playerCards);
+  const bTotal = handTotal(bankerCards);
+  if (pTotal >= 8 || bTotal >= 8) {
+    setDealerBubble('Natural!');
+    setDealerPose('reveal');
+    await delay(800);
+    return finishRound(deck, playerCards, bankerCards);
   }
 
-  // Calculate results
-  await delay(300);
-  let totalWin = 0;
-  let bettedHouses = Object.keys(bets);
+  // Third card phase
+  setDealerBubble('Drawing third card');
+  setDealerPose('dealing');
 
-  bettedHouses.forEach(h => {
-    const matchCount = drawn.filter(c => c.value === h).length;
-    if (matchCount > 0) {
-      let multiplier = 0;
-      if (matchCount === 1) multiplier = 1;
-      else if (matchCount === 2) multiplier = 2;
-      else if (matchCount === 3) multiplier = 4;
-      totalWin += bets[h] * (1 + multiplier);
-    }
-    drawn.forEach((c, idx) => {
-      if (c.value === h) {
-        document.getElementById('card' + (idx + 1)).classList.add('match');
-      }
-    });
-  });
+  const thirdResult = applyThirdCardRules(playerCards, bankerCards, deck);
 
-  balance += totalWin;
+  if (thirdResult.playerThird) {
+    await renderCard(thirdResult.playerThird, 'playerCards');
+    updateScore('player', playerCards);
+    await delay(450);
+  }
+  if (thirdResult.bankerThird) {
+    await renderCard(thirdResult.bankerThird, 'bankerCards');
+    updateScore('banker', bankerCards);
+    await delay(450);
+  }
 
-  // Update user in localStorage
+  setDealerBubble('Revealing result');
+  setDealerPose('reveal');
+  await delay(700);
+
+  return finishRound(deck, playerCards, bankerCards);
+}
+
+function updateScore(side, cards) {
+  const total = handTotal(cards);
+  document.getElementById(side + 'Score').textContent = total;
+}
+
+async function renderCard(card, containerId) {
+  const container = document.getElementById(containerId);
+  const cardEl = document.createElement('div');
+  cardEl.className = 'play-card';
+  cardEl.innerHTML = `
+    <div class="play-card-inner">
+      <div class="play-card-back">
+        <div class="play-card-back-pattern">A26</div>
+      </div>
+      <div class="play-card-face ${card.color}">
+        <div class="card-corner top">
+          <div class="card-rank">${card.rank}</div>
+          <div class="card-suit-sm">${card.suit}</div>
+        </div>
+        <div class="card-center">${card.suit}</div>
+        <div class="card-corner bottom">
+          <div class="card-rank">${card.rank}</div>
+          <div class="card-suit-sm">${card.suit}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  container.appendChild(cardEl);
+  // Slide-in + flip animation
+  cardEl.classList.add('slide-in');
+  await delay(50);
+  cardEl.classList.add('flip');
+  await delay(450);
+}
+
+async function finishRound(deck, playerCards, bankerCards) {
+  const result = calculatePayout(playerCards, bankerCards, bets);
+
+  balance += result.totalWin;
+  lastWin = result.totalWin;
+
+  // Update localStorage user
   const user = Auth.getUser();
   if (user) {
     user.balance = balance;
     localStorage.setItem('a26_user', JSON.stringify(user));
   }
 
-  await delay(600);
-  showResult(drawn, bettedHouses, totalWin, total);
+  // Show result banner
+  const banner = document.getElementById('resultBanner');
+  let bannerText = '';
+  let bannerCls = 'result-banner show';
+  if (result.winner === 'player') {
+    bannerText = 'PLAYER WINS';
+    bannerCls += ' win-player';
+  } else if (result.winner === 'banker') {
+    bannerText = 'BANKER WINS';
+    bannerCls += ' win-banker';
+  } else {
+    bannerText = 'TIE';
+    bannerCls += ' win-tie';
+  }
+  if (result.playerPair) bannerText += ' · P PAIR';
+  if (result.bankerPair) bannerText += ' · B PAIR';
+  banner.textContent = bannerText;
+  banner.className = bannerCls;
 
+  // Highlight winning hand
+  if (result.winner === 'player') {
+    document.getElementById('handPlayer').classList.add('hand-winner');
+  } else if (result.winner === 'banker') {
+    document.getElementById('handBanker').classList.add('hand-winner');
+  }
+
+  setDealerBubble(result.totalWin > 0 ? `You won ₹${result.totalWin.toLocaleString('en-IN')}!` : 'Better luck next round');
+
+  // Save history
   history.unshift({
-    round: round,
-    cards: drawn.map(c => c.value),
-    bets: { ...bets },
-    won: totalWin,
-    bet: total
+    round,
+    winner: result.winner,
+    playerTotal: result.pTotal,
+    bankerTotal: result.bTotal,
+    playerPair: result.playerPair,
+    bankerPair: result.bankerPair,
+    bet: totalBet,
+    won: result.totalWin
   });
   updateHistory();
+  updateScoreboard();
+
+  if (result.totalWin > 0) launchConfetti();
+
+  // Persist bet to backend (best-effort)
+  try {
+    await Auth.api('/api/player/bet', {
+      method: 'POST',
+      body: JSON.stringify({
+        roundId: 'round_' + round,
+        house: result.winner,
+        amount: totalBet,
+        winnings: result.totalWin,
+        result: result.winner,
+        finalBalance: balance
+      })
+    });
+  } catch (e) {
+    // ignore network errors - game still works client-side
+    console.log('Server sync skipped:', e.message);
+  }
 
   round++;
-  isDealing = false;
+  updateBalanceUI();
 
-  if (totalWin > 0) {
-    launchConfetti();
-  }
-}
-
-function showResult(drawn, bettedHouses, totalWin, totalBet) {
-  const overlay = document.getElementById('resultOverlay');
-  const title = document.getElementById('resultTitle');
-  const cardsEl = document.getElementById('resultCards');
-  const matchesEl = document.getElementById('resultMatches');
-  const amountEl = document.getElementById('resultAmount');
-
-  cardsEl.textContent = 'Cards drawn: ' + drawn.map(c => c.value + c.suit).join('  ');
-
-  let matchDetails = [];
-  bettedHouses.forEach(h => {
-    const mc = drawn.filter(c => c.value === h).length;
-    if (mc > 0) {
-      const ratio = mc === 1 ? '1:1' : mc === 2 ? '1:2' : '1:4';
-      matchDetails.push(`House ${h}: ${mc} match${mc > 1 ? 'es' : ''} (${ratio})`);
-    } else {
-      matchDetails.push(`House ${h}: No match`);
-    }
-  });
-  matchesEl.innerHTML = matchDetails.join('<br>');
-
-  if (totalWin > 0) {
-    title.textContent = 'You Win!';
-    amountEl.innerHTML = `<div class="win-amount">+₹${totalWin.toLocaleString('en-IN')}</div><div style="font-size:0.8rem;color:#aaa;margin-top:4px;">Net: ₹${(totalWin - totalBet).toLocaleString('en-IN')}</div>`;
-  } else {
-    title.textContent = 'No Luck';
-    amountEl.innerHTML = `<div class="lose-text">-₹${totalBet.toLocaleString('en-IN')}</div>`;
-  }
-
-  overlay.classList.add('show');
-  document.getElementById('dealerStatus').textContent = totalWin > 0 ? 'Congratulations!' : 'Better luck next time!';
-}
-
-function closeResult() {
-  document.getElementById('resultOverlay').classList.remove('show');
+  await delay(3000);
+  // Reset for next round
   resetRound();
 }
 
 function resetRound() {
   bets = {};
-  document.getElementById('betInput').value = '';
-  document.querySelectorAll('.house').forEach(el => el.classList.remove('selected'));
-  document.querySelectorAll('.house-bets').forEach(el => el.innerHTML = '');
-  document.getElementById('selectedHouseDisplay').textContent = 'Select a house';
-  document.getElementById('dealerStatus').textContent = 'Place your bets';
-  for (let i = 1; i <= 3; i++) {
-    const slot = document.getElementById('card' + i);
-    slot.classList.remove('revealed', 'match');
-    slot.querySelector('.card-back').style.display = '';
-    slot.querySelector('.card-face').style.display = 'none';
-  }
+  totalBet = 0;
+  document.querySelectorAll('.bet-tile-chips').forEach(el => el.innerHTML = '');
+  document.getElementById('handPlayer').classList.remove('hand-winner');
+  document.getElementById('handBanker').classList.remove('hand-winner');
+  document.getElementById('playerCards').innerHTML = '';
+  document.getElementById('bankerCards').innerHTML = '';
+  document.getElementById('playerScore').textContent = '0';
+  document.getElementById('bankerScore').textContent = '0';
   document.getElementById('btnClear').disabled = false;
-  updateUI();
+  document.getElementById('resultBanner').textContent = '';
+  document.getElementById('resultBanner').className = 'result-banner';
+  isDealing = false;
+  updateBalanceUI();
+  startBettingWindow();
 }
 
-function clearBets() {
-  if (isDealing) return;
-  document.querySelectorAll('.house').forEach(el => el.classList.remove('selected'));
-  document.querySelectorAll('.house-bets').forEach(el => el.innerHTML = '');
-  document.getElementById('selectedHouseDisplay').textContent = 'Select a house';
-  document.getElementById('betInput').value = '';
-  updateDealButton();
-}
-
-function updateUI() {
-  document.getElementById('balance').textContent = '₹' + balance.toLocaleString('en-IN');
-  const tb = Object.values(bets).reduce((a, b) => a + b, 0);
-  document.getElementById('totalBet').textContent = '₹' + tb.toLocaleString('en-IN');
-  document.getElementById('roundNum').textContent = round;
-  document.getElementById('nav-balance').textContent = '₹' + balance.toLocaleString('en-IN');
-}
-
+// === HISTORY ===
 function updateHistory() {
   const list = document.getElementById('historyList');
   list.innerHTML = '';
@@ -315,22 +633,54 @@ function updateHistory() {
     const div = document.createElement('div');
     div.className = 'history-item';
     const net = h.won - h.bet;
+    let winnerCls = 'tie';
+    let winnerLbl = 'T';
+    if (h.winner === 'player') { winnerCls = 'player'; winnerLbl = 'P'; }
+    else if (h.winner === 'banker') { winnerCls = 'banker'; winnerLbl = 'B'; }
     div.innerHTML = `
-      <div>R#${h.round}</div>
-      <div class="round-cards">${h.cards.join(' ')}</div>
-      <div class="round-result ${net >= 0 ? 'win' : 'lose'}">${net >= 0 ? '+' : ''}₹${net.toLocaleString('en-IN')}</div>
+      <div class="hist-bead ${winnerCls}">${winnerLbl}</div>
+      <div class="hist-totals">P${h.playerTotal} · B${h.bankerTotal}</div>
+      <div class="hist-net ${net >= 0 ? 'win' : 'lose'}">${net >= 0 ? '+' : ''}₹${net.toLocaleString('en-IN')}</div>
     `;
     list.appendChild(div);
   });
 }
 
+// === DECK SHUFFLE ANIMATION ===
+function animateDeckShuffle() {
+  const deck = document.getElementById('deckStack');
+  deck.classList.add('shuffling');
+  // Show "cut card" overlay
+  const cut = document.getElementById('cutOverlay');
+  cut.classList.add('active');
+  setTimeout(() => {
+    deck.classList.remove('shuffling');
+    cut.classList.remove('active');
+  }, 900);
+}
+
+// === FLASH MESSAGE ===
+function flashMessage(text) {
+  const banner = document.getElementById('resultBanner');
+  banner.textContent = text;
+  banner.className = 'result-banner show flash-msg';
+  setTimeout(() => {
+    if (banner.textContent === text) {
+      banner.textContent = '';
+      banner.className = 'result-banner';
+    }
+  }, 1500);
+}
+
+// === RULES TOGGLE ===
 function toggleRules() {
   document.getElementById('rulesPanel').classList.toggle('show');
 }
 
+// === CONFETTI ===
 function launchConfetti() {
-  const colors = ['#d4a843', '#f0d68a', '#c41e3a', '#2ecc71', '#fff'];
-  for (let i = 0; i < 60; i++) {
+  const colors = ['#d4a843', '#f0d68a', '#c41e3a', '#2ecc71', '#fff', '#3498db'];
+  for (let i = 0; i < 80; i++) {
     const piece = document.createElement('div');
     piece.className = 'confetti-piece';
     piece.style.left = Math.random() * 100 + 'vw';
