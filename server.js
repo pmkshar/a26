@@ -27,28 +27,49 @@ const DATA_FILE = isVercel
 
 // Initialize data
 async function initData() {
+  let data;
+  let existed = false;
   try {
     await fs.access(DATA_FILE);
+    existed = true;
+    const raw = await fs.readFile(DATA_FILE, 'utf-8');
+    data = JSON.parse(raw);
   } catch {
-    const initialData = {
-      users: [
-        {
-          id: 'admin1',
-          username: 'admin',
-          password: await bcrypt.hash('admin123', 10),
-          role: 'admin',
-          createdAt: new Date().toISOString()
-        }
-      ],
+    data = {
+      users: [],
       players: [],
       rounds: [],
       bets: []
     };
-    try {
-      await fs.writeFile(DATA_FILE, JSON.stringify(initialData, null, 2));
-    } catch (writeErr) {
-      console.error('Failed to write data file:', writeErr);
-    }
+  }
+
+  // Ensure the admin account exists with a ₹200,000 balance.
+  // This is idempotent: if admin already exists with a balance, we leave it
+  // alone (so admin credits/deductions persist). If admin exists WITHOUT a
+  // balance field (legacy), we set it to 200000. If admin doesn't exist,
+  // we create it with 200000.
+  const ADMIN_USERNAME = 'admin';
+  const ADMIN_PASSWORD = 'admin123';
+  const ADMIN_INITIAL_BALANCE = 200000;
+  let admin = data.users.find(u => u.username === ADMIN_USERNAME && u.role === 'admin');
+  if (!admin) {
+    admin = {
+      id: 'admin1',
+      username: ADMIN_USERNAME,
+      password: await bcrypt.hash(ADMIN_PASSWORD, 10),
+      role: 'admin',
+      balance: ADMIN_INITIAL_BALANCE,
+      createdAt: new Date().toISOString()
+    };
+    data.users.push(admin);
+  } else if (typeof admin.balance !== 'number') {
+    admin.balance = ADMIN_INITIAL_BALANCE;
+  }
+
+  try {
+    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
+  } catch (writeErr) {
+    console.error('Failed to write data file:', writeErr);
   }
 }
 
@@ -196,7 +217,25 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// === PLAYER ROUTES ===
+// === ME (current user, any role) ===
+app.get('/api/me', authenticateToken, async (req, res) => {
+  try {
+    const data = await loadData();
+    const user = data.users.find(u => u.id === req.user.id);
+    if (!user) return res.status(404).json({ error: 'User not found' });
+    res.json({
+      id: user.id,
+      username: user.username,
+      role: user.role,
+      balance: user.balance || 0,
+      email: user.email,
+      phone: user.phone,
+      createdAt: user.createdAt
+    });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to fetch user' });
+  }
+});
 
 // Get player dashboard
 app.get('/api/player/dashboard', authenticateToken, async (req, res) => {
@@ -300,12 +339,13 @@ app.get('/api/admin/players', authenticateToken, requireAdmin, async (req, res) 
       .map(u => ({
         id: u.id,
         username: u.username,
-        balance: u.balance,
+        balance: u.balance || 0,
         phone: u.phone,
         email: u.email,
         createdAt: u.createdAt,
         totalBets: data.bets.filter(b => b.playerId === u.id).length,
-        totalWinnings: data.bets.filter(b => b.playerId === u.id).reduce((sum, b) => sum + (b.winnings || 0), 0)
+        totalWinnings: data.bets.filter(b => b.playerId === u.id).reduce((sum, b) => sum + (b.winnings || 0), 0),
+        ledgerCount: (u.ledger || []).length
       }));
 
     res.json({ players });
@@ -315,7 +355,7 @@ app.get('/api/admin/players', authenticateToken, requireAdmin, async (req, res) 
   }
 });
 
-// Update player balance
+// Update player balance (sets absolute balance)
 app.put('/api/admin/players/:id/balance', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { balance } = req.body;
@@ -333,6 +373,65 @@ app.put('/api/admin/players/:id/balance', authenticateToken, requireAdmin, async
   } catch (error) {
     console.error('Update balance error:', error);
     res.status(500).json({ error: 'Failed to update balance' });
+  }
+});
+
+// Credit (add coins) to a player — ADDS the amount to current balance.
+// Supports negative amounts for deductions. Records a ledger entry for audit.
+app.post('/api/admin/players/:id/credit', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { amount, note } = req.body;
+    const amt = Number(amount);
+    if (!Number.isFinite(amt) || amt === 0) {
+      return res.status(400).json({ error: 'A non-zero numeric amount is required' });
+    }
+    const data = await loadData();
+    const user = data.users.find(u => u.id === req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: 'Player not found' });
+    }
+    const previousBalance = user.balance || 0;
+    const newBalance = previousBalance + amt;
+    if (newBalance < 0) {
+      return res.status(400).json({ error: 'Resulting balance cannot be negative' });
+    }
+    user.balance = newBalance;
+
+    // Append to ledger for audit
+    if (!Array.isArray(user.ledger)) user.ledger = [];
+    user.ledger.push({
+      type: amt > 0 ? 'credit' : 'debit',
+      amount: amt,
+      previousBalance,
+      newBalance,
+      note: note || (amt > 0 ? 'Admin credit' : 'Admin debit'),
+      by: req.user.username,
+      at: new Date().toISOString()
+    });
+
+    await saveData(data);
+    res.json({
+      success: true,
+      previousBalance,
+      credited: amt,
+      newBalance: user.balance,
+      ledger: user.ledger.slice(-5)
+    });
+  } catch (error) {
+    console.error('Credit error:', error);
+    res.status(500).json({ error: 'Failed to credit player' });
+  }
+});
+
+// Get a player's ledger (recent admin credits/debits)
+app.get('/api/admin/players/:id/ledger', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const data = await loadData();
+    const user = data.users.find(u => u.id === req.params.id);
+    if (!user) return res.status(404).json({ error: 'Player not found' });
+    res.json({ ledger: (user.ledger || []).slice(-20).reverse() });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load ledger' });
   }
 });
 
@@ -450,6 +549,7 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
     const players = data.users.filter(u => u.role === 'player');
     const totalBets = data.bets.reduce((sum, b) => sum + b.amount, 0);
     const totalPayout = data.bets.reduce((sum, b) => sum + (b.winnings || 0), 0);
+    const admin = data.users.find(u => u.id === req.user.id);
 
     res.json({
       totalPlayers: players.length,
@@ -457,7 +557,8 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
       totalBets,
       totalPayout,
       profit: totalBets - totalPayout,
-      activeRounds: data.rounds.filter(r => r.status === 'open').length
+      activeRounds: data.rounds.filter(r => r.status === 'open').length,
+      adminBalance: admin ? (admin.balance || 0) : 0
     });
   } catch (error) {
     console.error('Stats error:', error);

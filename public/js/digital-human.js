@@ -67,6 +67,13 @@
       u.onstart = () => { Human.lipSyncStart(opts); };
       u.onend = () => { Human.lipSyncStop(); };
       u.onerror = () => { Human.lipSyncStop(); };
+      // onboundary fires on each word — use it to drive mouth open/close frames
+      // for realistic word-synced lip movement.
+      u.onboundary = (ev) => {
+        if (ev.name === 'word' || ev.name === undefined) {
+          Human.mouthFrame();
+        }
+      };
       this.synth.speak(u);
     },
     cancel() {
@@ -197,10 +204,25 @@
     <img class="dh-img" data-pose="dealing"      src="/images/dealers/real_dealing.png"      alt="Priya dealing">
     <img class="dh-img" data-pose="reveal-win"   src="/images/dealers/real_reveal_win.png"   alt="Priya win">
     <img class="dh-img" data-pose="reveal-lose"  src="/images/dealers/real_reveal_lose.png"  alt="Priya lose">
+
+    <!-- Mouth overlay: dark semi-transparent ellipse positioned over the dealer's
+         mouth. Scales vertically during speech to simulate lip movement. -->
+    <div class="dh-mouth" id="dhMouth">
+      <div class="dh-mouth-inner" id="dhMouthInner"></div>
+      <div class="dh-teeth" id="dhTeeth"></div>
+    </div>
+
+    <!-- Eye overlays: thin neutral-toned bands that flash across the eyes to
+         simulate blinking. Two separate overlays for left/right eye. -->
+    <div class="dh-eye-lid dh-eye-left" id="dhEyeLeft"></div>
+    <div class="dh-eye-lid dh-eye-right" id="dhEyeRight"></div>
+
+    <!-- Eye-glint highlights that brighten on each blink -->
+    <div class="dh-eye-glint dh-eye-glint-left" id="dhGlintLeft"></div>
+    <div class="dh-eye-glint dh-eye-glint-right" id="dhGlintRight"></div>
+
     <!-- Vignette overlay for cinematic depth -->
     <div class="dh-vignette"></div>
-    <!-- Eye-glint flicker (subtle highlight that pulses when speaking) -->
-    <div class="dh-glint" id="dhGlint"></div>
     <!-- Lip-sync pulse ring (gold ring around dealer when speaking) -->
     <div class="dh-pulse-ring" id="dhPulseRing"></div>
   </div>
@@ -229,6 +251,19 @@
         this.layers[img.dataset.pose] = img;
       });
 
+      // Cache face overlays
+      this.parts = {
+        mouth: document.getElementById('dhMouth'),
+        mouthInner: document.getElementById('dhMouthInner'),
+        teeth: document.getElementById('dhTeeth'),
+        eyeLeft: document.getElementById('dhEyeLeft'),
+        eyeRight: document.getElementById('dhEyeRight'),
+        glintLeft: document.getElementById('dhGlintLeft'),
+        glintRight: document.getElementById('dhGlintRight'),
+        imageWrap: document.getElementById('dhImageWrap'),
+        pulseRing: document.getElementById('dhPulseRing')
+      };
+
       // Show only idle pose initially
       this.setPose('idle');
 
@@ -236,13 +271,12 @@
       Voice.init();
       this.startBreathing();
       this.startSway();
-      this.startGlint();
+      this.startBlinking();
       this.bindVoiceToggle();
 
-      // Preload all poses by setting opacity 0 then back
+      // Preload all poses
       Object.values(this.layers).forEach(img => {
         img.style.opacity = '0';
-        // Force browser to preload
         const _ = img.complete;
       });
       this.layers[this.currentPose].style.opacity = '1';
@@ -268,7 +302,10 @@
       });
     },
 
-    // ---------- EMOTIONS (drive subtle filters + ring color) ----------
+    // ---------- EMOTIONS ----------
+    // Each emotion applies: (a) CSS filter on the photo, (b) gesture class
+    // on the image-wrap (drives head tilt / nod / zoom / droop / shake),
+    // (c) colour of the pulse ring.
     setEmotion(emotion) {
       this.currentEmotion = emotion;
       const e = document.getElementById('dhEmotion');
@@ -276,25 +313,28 @@
         e.className = 'dh-emotion-indicator ' + emotion;
         e.textContent = emotion;
       }
-      // Apply a subtle filter to the image-wrap based on emotion
-      const wrap = document.getElementById('dhImageWrap');
+      const wrap = this.parts.imageWrap;
       if (wrap) {
+        // Remove all emotion gesture classes
+        ['happy','playful','excited','ecstatic','sad','serious','neutral'].forEach(c =>
+          wrap.classList.remove('emo-' + c));
+        wrap.classList.add('emo-' + emotion);
         wrap.dataset.emotion = emotion;
       }
-      // Pulse ring color
-      const ring = document.getElementById('dhPulseRing');
+      const ring = this.parts.pulseRing;
       if (ring) ring.dataset.emotion = emotion;
     },
 
     // ---------- BREATHING (subtle scale on image wrap) ----------
+    // Note: combined with the sway transform via CSS variable --sway.
     startBreathing() {
       let phase = 0;
       this.breatheTimer = setInterval(() => {
         if (!this.initialized) return;
         phase += 0.04;
         const scale = 1 + Math.sin(phase) * 0.008;
-        const wrap = document.getElementById('dhImageWrap');
-        if (wrap) wrap.style.transform = `scale(${scale})`;
+        const wrap = this.parts.imageWrap;
+        if (wrap) wrap.style.setProperty('--breathe', scale);
       }, 80);
     },
 
@@ -305,52 +345,95 @@
         if (!this.initialized) return;
         phase += 0.03;
         const tilt = Math.sin(phase) * 0.4;
-        const wrap = document.getElementById('dhImageWrap');
-        if (wrap) wrap.style.setProperty('--sway', `${tilt}deg`);
+        const wrap = this.parts.imageWrap;
+        if (wrap) wrap.style.setProperty('--sway', tilt + 'deg');
       }, 100);
     },
 
-    // ---------- EYE GLINT (subtle pulse) ----------
-    startGlint() {
-      const glint = () => {
+    // ---------- BLINKING (realistic eye-open/close) ----------
+    // Random double-blinks every 2.5-6s. The CSS class .blink drives a quick
+    // y-scale of the eyelid overlays from 0 -> 1 -> 0.
+    startBlinking() {
+      const blink = () => {
         if (!this.initialized) return;
-        const g = document.getElementById('dhGlint');
-        if (g) {
-          g.classList.add('flash');
-          setTimeout(() => g.classList.remove('flash'), 200);
-        }
-        setTimeout(glint, 3000 + Math.random() * 4000);
+        const doBlink = () => {
+          const L = this.parts.eyeLeft, R = this.parts.eyeRight;
+          const gL = this.parts.glintLeft, gR = this.parts.glintRight;
+          if (L) L.classList.add('blink');
+          if (R) R.classList.add('blink');
+          if (gL) gL.classList.add('flash');
+          if (gR) gR.classList.add('flash');
+          setTimeout(() => {
+            if (L) L.classList.remove('blink');
+            if (R) R.classList.remove('blink');
+            if (gL) gL.classList.remove('flash');
+            if (gR) gR.classList.remove('flash');
+          }, 150);
+        };
+        doBlink();
+        // Occasionally double-blink
+        if (Math.random() < 0.25) setTimeout(doBlink, 280);
+        setTimeout(blink, 2500 + Math.random() * 3500);
       };
-      setTimeout(glint, 2000);
+      setTimeout(blink, 1500);
     },
 
-    // ---------- LIP-SYNC (pulse ring + glint flicker while speaking) ----------
+    // ---------- LIP-SYNC (mouth opens/closes per word) ----------
     lipSyncStart(opts) {
-      const ring = document.getElementById('dhPulseRing');
-      const glint = document.getElementById('dhGlint');
+      const ring = this.parts.pulseRing;
       if (ring) ring.classList.add('speaking');
-      // Flicker the glint rapidly to simulate lip movement
+      const mouth = this.parts.mouth;
+      if (mouth) mouth.classList.add('speaking');
+      // Drive a fallback mouth animation in case onboundary doesn't fire
+      // (some browsers/voices don't emit boundary events).
       let frame = 0;
       this.lipSyncTimer = setInterval(() => {
         if (!this.initialized) return;
-        if (glint) {
-          glint.style.opacity = (frame % 2 === 0) ? '0.7' : '0.2';
-        }
+        this._mouthFrame(frame);
         frame++;
-      }, 110);
+      }, 130);
+    },
+    // Called per word boundary (from Voice.speak) for word-synced movement.
+    mouthFrame() { this._mouthFrame(Math.floor(Math.random() * 4)); },
+    _mouthFrame(frame) {
+      const mouth = this.parts.mouth;
+      const inner = this.parts.mouthInner;
+      const teeth = this.parts.teeth;
+      if (!mouth) return;
+      // Four mouth shapes cycling: closed, small, medium, wide-open
+      const shapes = [
+        { h: 4,  op: 0.0, teeth: 0 },   // closed
+        { h: 8,  op: 0.4, teeth: 0.4 }, // small
+        { h: 14, op: 0.7, teeth: 0.7 }, // medium
+        { h: 20, op: 1.0, teeth: 1.0 }  // wide
+      ];
+      const s = shapes[frame % shapes.length];
+      mouth.style.setProperty('--mouth-h', s.h + 'px');
+      mouth.style.setProperty('--mouth-op', s.op);
+      if (inner) inner.style.opacity = s.op * 0.85;
+      if (teeth) teeth.style.opacity = s.teeth * 0.5;
     },
     lipSyncStop() {
       if (this.lipSyncTimer) { clearInterval(this.lipSyncTimer); this.lipSyncTimer = null; }
-      const ring = document.getElementById('dhPulseRing');
-      const glint = document.getElementById('dhGlint');
+      const ring = this.parts.pulseRing;
+      const mouth = this.parts.mouth;
       if (ring) ring.classList.remove('speaking');
-      if (glint) glint.style.opacity = '';
+      if (mouth) {
+        mouth.classList.remove('speaking');
+        mouth.style.setProperty('--mouth-h', '2px');
+        mouth.style.setProperty('--mouth-op', '0');
+      }
+      if (this.parts.mouthInner) this.parts.mouthInner.style.opacity = '0';
+      if (this.parts.teeth) this.parts.teeth.style.opacity = '0';
     },
     lipSync(text, opts = {}) {
-      // Fallback when voice disabled — simulate duration from text length
+      // Fallback when voice disabled — simulate duration from text length.
       const duration = Math.max(800, text.length * 60);
       this.lipSyncStart(opts);
-      setTimeout(() => this.lipSyncStop(), duration);
+      // Simulate word boundaries by triggering mouth frames every ~180ms.
+      let frame = 0;
+      const t = setInterval(() => this._mouthFrame(frame++), 180);
+      setTimeout(() => { clearInterval(t); this.lipSyncStop(); }, duration);
     },
 
     // ---------- SPEECH BUBBLE ----------

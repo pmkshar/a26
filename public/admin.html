@@ -5,7 +5,142 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>A26 - Admin Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css">
+<link rel="stylesheet" href="/css/style.css?v=dh3">
+<style>
+  /* Admin-page-only styles for the Add-Coins modal */
+  .credit-modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+  }
+  .credit-modal-overlay.show { display: flex; }
+  .credit-modal {
+    background: linear-gradient(180deg, #1a3a28 0%, #0a1f15 100%);
+    border: 2px solid var(--gold);
+    border-radius: 16px;
+    padding: 24px;
+    width: 92%;
+    max-width: 420px;
+    color: var(--cream);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 0 30px rgba(212,168,67,0.25);
+  }
+  .credit-modal h3 {
+    font-family: var(--font-heading);
+    color: var(--gold-light);
+    margin-bottom: 6px;
+    font-size: 1.3rem;
+  }
+  .credit-modal .modal-sub {
+    font-size: 0.8rem; color: var(--gold); opacity: 0.8; margin-bottom: 18px;
+  }
+  .credit-modal .form-row { margin-bottom: 14px; }
+  .credit-modal label {
+    display: block; font-size: 0.75rem; color: var(--gold-light);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px;
+  }
+  .credit-modal input, .credit-modal select, .credit-modal textarea {
+    width: 100%; padding: 10px 12px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid var(--gold-dark);
+    border-radius: 8px;
+    color: var(--cream);
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+  }
+  .credit-modal input:focus, .credit-modal textarea:focus {
+    outline: none; border-color: var(--gold);
+    box-shadow: 0 0 0 2px rgba(212,168,67,0.25);
+  }
+  .quick-amounts {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 6px;
+  }
+  .quick-amounts button {
+    padding: 6px 0; background: rgba(212,168,67,0.12);
+    border: 1px solid var(--gold-dark); color: var(--gold-light);
+    border-radius: 6px; font-size: 0.75rem; cursor: pointer;
+    font-family: var(--font-body); font-weight: 600;
+    transition: all 0.15s;
+  }
+  .quick-amounts button:hover {
+    background: var(--gold); color: #1a1a1a;
+  }
+  .modal-actions {
+    display: flex; gap: 10px; margin-top: 20px; justify-content: flex-end;
+  }
+  .modal-btn {
+    padding: 10px 20px; border-radius: 8px; cursor: pointer;
+    font-family: var(--font-body); font-weight: 700; font-size: 0.85rem;
+    border: 1px solid transparent; transition: all 0.15s;
+  }
+  .modal-btn-cancel {
+    background: rgba(255,255,255,0.06); color: var(--cream);
+    border-color: rgba(255,255,255,0.15);
+  }
+  .modal-btn-cancel:hover { background: rgba(255,255,255,0.12); }
+  .modal-btn-credit {
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+    color: #1a1a1a;
+  }
+  .modal-btn-credit:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(212,168,67,0.4); }
+  .modal-btn-debit {
+    background: linear-gradient(135deg, #8b0000, #c41e3a);
+    color: #fff;
+  }
+  .modal-btn-debit:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(196,30,58,0.4); }
+
+  .balance-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+    color: #1a1a1a; padding: 4px 12px; border-radius: 12px;
+    font-weight: 700; font-size: 0.85rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .balance-pill::before { content: '👑'; font-size: 0.95rem; }
+
+  .player-row td { vertical-align: middle; }
+  .credit-btn {
+    background: linear-gradient(135deg, #0d8a48, #2ecc71);
+    color: #fff; border: none; padding: 6px 12px;
+    border-radius: 6px; cursor: pointer; font-weight: 600;
+    font-size: 0.78rem; margin-right: 4px;
+  }
+  .credit-btn:hover { transform: translateY(-1px); box-shadow: 0 3px 8px rgba(46,204,113,0.4); }
+  .ledger-btn {
+    background: rgba(255,255,255,0.06); color: var(--gold-light);
+    border: 1px solid var(--gold-dark); padding: 6px 12px;
+    border-radius: 6px; cursor: pointer; font-weight: 600;
+    font-size: 0.78rem;
+  }
+  .ledger-btn:hover { background: rgba(212,168,67,0.15); }
+
+  .ledger-list {
+    max-height: 260px; overflow-y: auto;
+    background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px;
+    font-size: 0.78rem;
+  }
+  .ledger-item {
+    display: flex; justify-content: space-between;
+    padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .ledger-item:last-child { border-bottom: none; }
+  .ledger-credit { color: #2ecc71; }
+  .ledger-debit  { color: #e74c3c; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: linear-gradient(135deg, #0d8a48, #2ecc71);
+    color: #fff; padding: 12px 22px; border-radius: 30px;
+    font-weight: 600; font-size: 0.9rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 1100; opacity: 0;
+    transition: opacity 0.25s, transform 0.25s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
+  .toast.error { background: linear-gradient(135deg, #8b0000, #c41e3a); }
+</style>
 </head>
 <body>
 
@@ -15,6 +150,7 @@
   <div class="nav-info">
     <span class="nav-user" id="nav-user"></span>
     <span class="nav-role badge badge-admin" id="nav-role">Admin</span>
+    <span class="balance-pill" id="adminBalancePill">₹0</span>
     <div class="nav-links">
       <a href="/index.html">Play Game</a>
       <a href="#" id="nav-logout">Logout</a>
@@ -27,6 +163,10 @@
   <div class="dashboard-card">
     <h2>System Overview</h2>
     <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">Admin Balance</div>
+        <div class="stat-value" id="adminBalance" style="color: var(--gold-light);">₹0</div>
+      </div>
       <div class="stat-box">
         <div class="stat-label">Total Players</div>
         <div class="stat-value" id="adminPlayers">0</div>
@@ -68,18 +208,77 @@
   <!-- PLAYER MANAGEMENT -->
   <div class="dashboard-card">
     <h2>Player Management</h2>
+    <p style="font-size: 0.8rem; color: var(--gold); opacity: 0.8; margin-bottom: 12px;">
+      Use the <strong>Add Coins</strong> button to credit or debit any registered player.
+      All transactions are recorded in a per-player ledger.
+    </p>
     <div id="playersTable">
       <p style="color: var(--gold); opacity: 0.6;">Loading players...</p>
     </div>
   </div>
 </div>
 
-<script src="/js/auth.js"></script>
+<!-- ADD-COINS MODAL -->
+<div class="credit-modal-overlay" id="creditModal">
+  <div class="credit-modal">
+    <h3>Add Coins to Player</h3>
+    <div class="modal-sub" id="creditModalSub">--</div>
+    <div class="form-row">
+      <label>Amount (₹)</label>
+      <input type="number" id="creditAmount" placeholder="e.g. 5000" min="1" step="1">
+      <div class="quick-amounts">
+        <button data-amt="1000">₹1K</button>
+        <button data-amt="5000">₹5K</button>
+        <button data-amt="10000">₹10K</button>
+        <button data-amt="50000">₹50K</button>
+      </div>
+    </div>
+    <div class="form-row">
+      <label>Note (optional)</label>
+      <textarea id="creditNote" rows="2" placeholder="Reason for credit / debit"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn modal-btn-cancel" onclick="closeCreditModal()">Cancel</button>
+      <button class="modal-btn modal-btn-debit" onclick="submitCredit('debit')">− Debit</button>
+      <button class="modal-btn modal-btn-credit" onclick="submitCredit('credit')">+ Add Coins</button>
+    </div>
+  </div>
+</div>
+
+<!-- LEDGER MODAL -->
+<div class="credit-modal-overlay" id="ledgerModal">
+  <div class="credit-modal">
+    <h3>Player Ledger</h3>
+    <div class="modal-sub" id="ledgerModalSub">--</div>
+    <div class="ledger-list" id="ledgerList">
+      <p style="color: var(--gold); opacity: 0.6;">No transactions yet.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-btn modal-btn-cancel" onclick="closeLedgerModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="/js/auth.js?v=dh3"></script>
 <script>
 Auth.requireAdmin();
 Auth.updateNav();
 
-// Load admin stats
+// === STATE ===
+let currentCreditPlayer = null;
+
+// === TOAST ===
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => { t.className = 'toast' + (isError ? ' error' : ''); }, 2800);
+}
+
+// === LOAD STATS ===
 async function loadStats() {
   try {
     const data = await Auth.api('/api/admin/stats');
@@ -87,28 +286,33 @@ async function loadStats() {
     document.getElementById('adminRounds').textContent = data.totalRounds;
     document.getElementById('adminTotalBets').textContent = '₹' + data.totalBets.toLocaleString('en-IN');
     document.getElementById('adminPayout').textContent = '₹' + data.totalPayout.toLocaleString('en-IN');
-    
+
     const profitEl = document.getElementById('adminProfit');
     profitEl.textContent = '₹' + data.profit.toLocaleString('en-IN');
     profitEl.className = 'stat-value ' + (data.profit >= 0 ? 'positive' : 'negative');
-    
+
     document.getElementById('adminActive').textContent = data.activeRounds;
+
+    // Admin balance (NEW)
+    const adminBal = data.adminBalance || 0;
+    document.getElementById('adminBalance').textContent = '₹' + adminBal.toLocaleString('en-IN');
+    document.getElementById('adminBalancePill').textContent = '₹' + adminBal.toLocaleString('en-IN');
   } catch (err) {
     console.error('Failed to load stats:', err);
   }
 }
 
-// Load rounds
+// === LOAD ROUNDS ===
 async function loadRounds() {
   try {
     const data = await Auth.api('/api/admin/rounds');
     const container = document.getElementById('roundsTable');
-    
+
     if (data.rounds.length === 0) {
       container.innerHTML = '<p style="color: var(--gold); opacity: 0.6;">No rounds yet</p>';
       return;
     }
-    
+
     container.innerHTML = `
       <table class="data-table">
         <thead>
@@ -144,17 +348,17 @@ async function loadRounds() {
   }
 }
 
-// Load players
+// === LOAD PLAYERS ===
 async function loadPlayers() {
   try {
     const data = await Auth.api('/api/admin/players');
     const container = document.getElementById('playersTable');
-    
+
     if (data.players.length === 0) {
-      container.innerHTML = '<p style="color: var(--gold); opacity: 0.6;">No players registered yet</p>';
+      container.innerHTML = '<p style="color: var(--gold); opacity: 0.6;">No players registered yet. Players will appear here after they sign up at /login.html.</p>';
       return;
     }
-    
+
     container.innerHTML = `
       <table class="data-table">
         <thead>
@@ -163,20 +367,23 @@ async function loadPlayers() {
             <th>Balance</th>
             <th>Total Bets</th>
             <th>Winnings</th>
+            <th>Ledger</th>
             <th>Joined</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           ${data.players.map(player => `
-            <tr>
-              <td>${player.username}</td>
+            <tr class="player-row">
+              <td><strong>${player.username}</strong><br><span style="font-size:0.7rem;opacity:0.6;">${player.email || player.phone || player.id}</span></td>
               <td>₹${player.balance.toLocaleString('en-IN')}</td>
               <td>${player.totalBets}</td>
               <td>₹${player.totalWinnings.toLocaleString('en-IN')}</td>
+              <td>${player.ledgerCount || 0}</td>
               <td>${new Date(player.createdAt).toLocaleDateString()}</td>
               <td>
-                <button class="btn btn-sm" style="background: var(--gold); color: #1a1a1a;" onclick="adjustBalance('${player.id}', ${player.balance})">Adjust</button>
+                <button class="credit-btn" onclick="openCreditModal('${player.id}', '${player.username}', ${player.balance})">+ Add Coins</button>
+                <button class="ledger-btn" onclick="openLedgerModal('${player.id}', '${player.username}')">Ledger</button>
               </td>
             </tr>
           `).join('')}
@@ -188,60 +395,137 @@ async function loadPlayers() {
   }
 }
 
-// Create new round
+// === CREATE ROUND ===
 async function createRound() {
   try {
     await Auth.api('/api/admin/rounds', { method: 'POST' });
     loadRounds();
     loadStats();
+    showToast('New round created');
   } catch (err) {
-    alert('Failed to create round: ' + err.message);
+    showToast('Failed to create round: ' + err.message, true);
   }
 }
 
-// Deal cards for round
+// === DEAL ROUND ===
 async function dealRound(roundId) {
   if (!confirm('Deal cards for this round?')) return;
-  
   try {
     const data = await Auth.api(`/api/admin/rounds/${roundId}/deal`, { method: 'POST' });
-    alert(`Cards dealt: ${data.round.cards.map(c => c.value + c.suit).join(', ')}`);
+    showToast(`Cards dealt: ${data.round.cards.map(c => c.value + c.suit).join(', ')}`);
     loadRounds();
     loadStats();
     loadPlayers();
   } catch (err) {
-    alert('Failed to deal: ' + err.message);
+    showToast('Failed to deal: ' + err.message, true);
   }
 }
 
-// Adjust player balance
-function adjustBalance(playerId, currentBalance) {
-  const newBalance = prompt('Enter new balance for this player:', currentBalance);
-  if (newBalance === null) return;
-  
-  const amount = parseInt(newBalance);
-  if (isNaN(amount) || amount < 0) {
-    alert('Invalid amount');
+// === ADD-COINS MODAL ===
+function openCreditModal(playerId, username, currentBalance) {
+  currentCreditPlayer = { id: playerId, username, currentBalance };
+  document.getElementById('creditModalSub').textContent =
+    `Player: ${username} · Current balance: ₹${currentBalance.toLocaleString('en-IN')}`;
+  document.getElementById('creditAmount').value = '';
+  document.getElementById('creditNote').value = '';
+  document.getElementById('creditModal').classList.add('show');
+  setTimeout(() => document.getElementById('creditAmount').focus(), 100);
+}
+
+function closeCreditModal() {
+  document.getElementById('creditModal').classList.remove('show');
+  currentCreditPlayer = null;
+}
+
+// Quick-amount buttons inside the modal
+document.addEventListener('click', (e) => {
+  if (e.target.closest('.quick-amounts button')) {
+    const amt = e.target.closest('.quick-amounts button').dataset.amt;
+    document.getElementById('creditAmount').value = amt;
+  }
+});
+
+// Submit credit/debit
+async function submitCredit(action) {
+  if (!currentCreditPlayer) return;
+  const rawAmount = parseInt(document.getElementById('creditAmount').value);
+  const note = document.getElementById('creditNote').value.trim();
+
+  if (!rawAmount || rawAmount <= 0) {
+    showToast('Enter a valid positive amount', true);
     return;
   }
-  
-  Auth.api(`/api/admin/players/${playerId}/balance`, {
-    method: 'PUT',
-    body: JSON.stringify({ balance: amount })
-  }).then(() => {
+
+  // For 'debit', send negative amount
+  const amount = action === 'debit' ? -rawAmount : rawAmount;
+
+  try {
+    const result = await Auth.api(`/api/admin/players/${currentCreditPlayer.id}/credit`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, note: note || (action === 'credit' ? 'Admin credit' : 'Admin debit') })
+    });
+    showToast(`${action === 'credit' ? 'Credited' : 'Debited'} ₹${rawAmount.toLocaleString('en-IN')} to ${currentCreditPlayer.username}. New balance: ₹${result.newBalance.toLocaleString('en-IN')}`);
+    closeCreditModal();
     loadPlayers();
-    alert('Balance updated successfully');
-  }).catch(err => {
-    alert('Failed to update: ' + err.message);
-  });
+    loadStats();
+  } catch (err) {
+    showToast('Failed: ' + (err.message || 'Unknown error'), true);
+  }
 }
 
-// Initial load
+// Close modal on overlay click
+document.getElementById('creditModal').addEventListener('click', (e) => {
+  if (e.target.id === 'creditModal') closeCreditModal();
+});
+
+// === LEDGER MODAL ===
+async function openLedgerModal(playerId, username) {
+  document.getElementById('ledgerModalSub').textContent = `Recent admin transactions for ${username}`;
+  document.getElementById('ledgerModal').classList.add('show');
+  document.getElementById('ledgerList').innerHTML = '<p style="color: var(--gold); opacity: 0.6;">Loading...</p>';
+  try {
+    const data = await Auth.api(`/api/admin/players/${playerId}/ledger`);
+    if (!data.ledger || data.ledger.length === 0) {
+      document.getElementById('ledgerList').innerHTML = '<p style="color: var(--gold); opacity: 0.6;">No transactions yet.</p>';
+      return;
+    }
+    document.getElementById('ledgerList').innerHTML = data.ledger.map(entry => `
+      <div class="ledger-item">
+        <div>
+          <div class="ledger-${entry.type}">
+            ${entry.type === 'credit' ? '+' : '−'} ₹${Math.abs(entry.amount).toLocaleString('en-IN')}
+          </div>
+          <div style="font-size:0.7rem; opacity:0.7; margin-top:2px;">
+            ${new Date(entry.at).toLocaleString()} · by ${entry.by}
+          </div>
+          ${entry.note ? `<div style="font-size:0.72rem; opacity:0.85; margin-top:2px;">${entry.note}</div>` : ''}
+        </div>
+        <div style="text-align:right; font-size:0.75rem;">
+          <div>₹${entry.previousBalance.toLocaleString('en-IN')}</div>
+          <div style="opacity:0.5;">→</div>
+          <div style="font-weight:700;">₹${entry.newBalance.toLocaleString('en-IN')}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch (err) {
+    document.getElementById('ledgerList').innerHTML = '<p style="color:#e74c3c;">Failed to load ledger.</p>';
+  }
+}
+
+function closeLedgerModal() {
+  document.getElementById('ledgerModal').classList.remove('show');
+}
+
+document.getElementById('ledgerModal').addEventListener('click', (e) => {
+  if (e.target.id === 'ledgerModal') closeLedgerModal();
+});
+
+// === INITIAL LOAD ===
 loadStats();
 loadRounds();
 loadPlayers();
 
-// Refresh every 10 seconds
+// Refresh stats + rounds every 10s (players only refresh after actions)
 setInterval(() => {
   loadStats();
   loadRounds();

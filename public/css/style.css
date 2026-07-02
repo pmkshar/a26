@@ -1492,7 +1492,7 @@ body::before {
   z-index: 1;
 }
 
-/* === IMAGE WRAP (holds stacked pose images) === */
+/* === IMAGE WRAP (holds stacked pose images + face overlays) === */
 .dh-image-wrap {
   position: relative;
   width: 100%;
@@ -1500,11 +1500,17 @@ body::before {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  transform: scale(1);
-  transform-origin: 50% 100%;
-  transition: transform 0.4s ease, filter 0.5s ease;
-  z-index: 2;
+  /* Compose breathing + sway + emotion gesture into one transform.
+     --breathe (number, default 1) and --sway (angle) are set by JS timers. */
+  --breathe: 1;
   --sway: 0deg;
+  --tilt: 0deg;
+  --nod: 0px;
+  --zoom: 1;
+  transform: scale(var(--breathe, 1)) scale(var(--zoom, 1)) rotate(var(--sway, 0deg)) rotate(var(--tilt, 0deg)) translateY(var(--nod, 0px));
+  transform-origin: 50% 100%;
+  transition: filter 0.5s ease, --tilt 0.5s ease, --nod 0.5s ease, --zoom 0.5s ease;
+  z-index: 2;
 }
 
 /* Subtle emotion filters (kept gentle so the photo stays realistic) */
@@ -1516,19 +1522,76 @@ body::before {
 .dh-image-wrap[data-emotion="serious"]    { filter: brightness(0.98) saturate(0.96) contrast(1.02); }
 .dh-image-wrap[data-emotion="neutral"]    { filter: brightness(1.0) saturate(1.0); }
 
+/* === EMOTION GESTURES (full-image motion per emotion) === */
+/* Each gesture class drives a different combination of --tilt / --nod / --zoom
+   so the dealer visibly reacts. The .dh-image-wrap base rule above composes
+   them into one transform. */
+.dh-image-wrap.emo-happy     { animation: emoHappy 2.4s ease-in-out infinite; }
+.dh-image-wrap.emo-playful   { animation: emoPlayful 3.0s ease-in-out infinite; }
+.dh-image-wrap.emo-excited   { animation: emoExcited 1.0s ease-in-out infinite; }
+.dh-image-wrap.emo-ecstatic  { animation: emoEcstatic 0.6s ease-in-out infinite; }
+.dh-image-wrap.emo-sad       { animation: emoSad 4.0s ease-in-out infinite; }
+.dh-image-wrap.emo-serious   { animation: emoSerious 5.0s ease-in-out infinite; }
+.dh-image-wrap.emo-neutral   { animation: none; }
+
+@keyframes emoHappy {
+  0%, 100% { --tilt: 0deg;   --nod: 0px;  --zoom: 1; }
+  50%      { --tilt: 1.5deg; --nod: -2px; --zoom: 1.005; }
+}
+@keyframes emoPlayful {
+  0%, 100% { --tilt: -2deg;  --nod: 0px; }
+  50%      { --tilt: 2deg;   --nod: -1px; }
+}
+@keyframes emoExcited {
+  0%, 100% { --nod: 0px;  --zoom: 1; }
+  25%      { --nod: -3px; --zoom: 1.015; }
+  50%      { --nod: 0px;  --zoom: 1; }
+  75%      { --nod: -3px; --zoom: 1.015; }
+}
+@keyframes emoEcstatic {
+  0%, 100% { --nod: 0px;  --zoom: 1; }
+  50%      { --nod: -4px; --zoom: 1.025; }
+}
+@keyframes emoSad {
+  0%, 100% { --tilt: 0deg;  --nod: 2px; }
+  50%      { --tilt: -1deg; --nod: 3px; }
+}
+@keyframes emoSerious {
+  0%, 100% { --tilt: 0deg; --nod: 0px; }
+  50%      { --tilt: 0.5deg; --nod: 1px; }
+}
+
+/* Note: CSS custom properties don't interpolate by default; register them
+   so the @keyframes above actually transition smoothly. */
+@property --tilt {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+@property --nod {
+  syntax: '<length>';
+  initial-value: 0px;
+  inherits: false;
+}
+@property --zoom {
+  syntax: '<number>';
+  initial-value: 1;
+  inherits: false;
+}
+
 /* === STACKED POSE IMAGES === */
 .dh-img {
   position: absolute;
   bottom: 0;
   left: 50%;
-  transform: translateX(-50%) rotate(var(--sway, 0deg));
+  transform: translateX(-50%);
   height: 100%;
   width: auto;
   max-width: 115%;
   object-fit: cover;
   object-position: center 18%;
   opacity: 0;
-  transition: opacity 0.5s ease, transform 0.5s ease;
+  transition: opacity 0.5s ease;
   pointer-events: none;
   will-change: opacity;
 }
@@ -1548,25 +1611,115 @@ body::before {
   z-index: 3;
 }
 
-/* === EYE GLINT === */
-.dh-glint {
+/* === MOUTH OVERLAY (lip-sync) === */
+/* Positioned over the dealer's mouth in the portrait photo.
+   The mouth "opens" by scaling its inner ellipse vertically.
+   --mouth-h is driven by JS (4px closed → 20px wide-open). */
+.dh-mouth {
   position: absolute;
-  top: 28%;
   left: 50%;
-  transform: translateX(-50%);
-  width: 90px;
-  height: 12px;
-  background: radial-gradient(ellipse, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0) 70%);
-  opacity: 0;
+  top: 47%;
+  transform: translate(-50%, -50%);
+  width: 56px;
+  height: var(--mouth-h, 2px);
+  background: rgba(40, 8, 12, 0.85);
+  border-radius: 50% 50% 50% 50%;
+  opacity: var(--mouth-op, 0);
   pointer-events: none;
-  z-index: 4;
-  filter: blur(2px);
-  transition: opacity 0.15s ease;
+  z-index: 5;
+  transition: height 0.08s ease, opacity 0.1s ease;
+  overflow: hidden;
+  box-shadow: 0 0 4px rgba(0,0,0,0.4);
 }
 
-.dh-glint.flash {
-  opacity: 0.7;
+/* Inner dark-red cavity (the inside of the mouth when open) */
+.dh-mouth-inner {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, #5a0f1a 0%, #2a0510 100%);
+  border-radius: 50% 50% 50% 50%;
+  opacity: 0;
+  transition: opacity 0.08s ease;
 }
+
+/* Teeth: thin white horizontal strip near top of mouth when open */
+.dh-teeth {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 3px;
+  background: linear-gradient(180deg, #fafafa, #d8d0c8);
+  border-radius: 2px 2px 0 0;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+}
+
+/* Mouth shape shifts slightly per emotion (smile vs frown) */
+.dh-image-wrap.emo-happy .dh-mouth,
+.dh-image-wrap.emo-playful .dh-mouth,
+.dh-image-wrap.emo-excited .dh-mouth,
+.dh-image-wrap.emo-ecstatic .dh-mouth {
+  border-radius: 50% 50% 45% 45%;
+}
+.dh-image-wrap.emo-sad .dh-mouth {
+  border-radius: 45% 45% 50% 50%;
+  transform: translate(-50%, -50%) scaleY(-1);
+}
+.dh-image-wrap.emo-serious .dh-mouth {
+  width: 40px;
+}
+
+/* === EYE LIDS (blink overlay) === */
+/* Thin neutral-toned bands positioned over the dealer's eyes. They sit
+   flat (opacity 0) most of the time, then briefly drop to opacity 1 to
+   simulate a blink. */
+.dh-eye-lid {
+  position: absolute;
+  width: 32px;
+  height: 14px;
+  top: 32%;
+  background: linear-gradient(180deg,
+    rgba(220, 175, 140, 0) 0%,
+    rgba(220, 175, 140, 0.95) 35%,
+    rgba(180, 130, 95, 0.95) 65%,
+    rgba(180, 130, 95, 0) 100%);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5;
+  transform: scaleY(0.05);
+  transform-origin: 50% 50%;
+  transition: transform 0.06s ease, opacity 0.06s ease;
+}
+
+.dh-eye-lid.blink {
+  transform: scaleY(1);
+  opacity: 1;
+}
+
+.dh-eye-left  { left: calc(50% - 36px); }
+.dh-eye-right { left: calc(50% + 4px); }
+
+/* === EYE GLINTS (sparkle highlights that flash on each blink) === */
+.dh-eye-glint {
+  position: absolute;
+  top: 31%;
+  width: 20px;
+  height: 6px;
+  background: radial-gradient(ellipse, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 70%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 6;
+  filter: blur(1px);
+  transition: opacity 0.1s ease;
+}
+
+.dh-eye-glint.flash { opacity: 0.9; }
+
+.dh-eye-glint-left  { left: calc(50% - 32px); }
+.dh-eye-glint-right { left: calc(50% + 12px); }
 
 /* === LIP-SYNC PULSE RING === */
 .dh-pulse-ring {
@@ -1747,7 +1900,14 @@ body::before {
   .dh-voice-toggle { width: 26px; height: 26px; top: 32px; right: 6px; }
   .dh-voice-toggle svg { width: 14px; height: 14px; }
   .dh-name-plate { font-size: 0.62rem; padding: 3px 10px; bottom: 48px; }
-  .dh-glint { width: 60px; height: 8px; top: 26%; }
+  /* Face overlays scale with the smaller video pane */
+  .dh-mouth   { width: 44px; top: 46%; }
+  .dh-eye-lid { width: 26px; height: 12px; top: 32%; }
+  .dh-eye-left  { left: calc(50% - 30px); }
+  .dh-eye-right { left: calc(50% + 4px); }
+  .dh-eye-glint { width: 16px; height: 5px; top: 31%; }
+  .dh-eye-glint-left  { left: calc(50% - 26px); }
+  .dh-eye-glint-right { left: calc(50% + 10px); }
 }
 
 @media (max-width: 500px) {
@@ -1756,10 +1916,18 @@ body::before {
   .dh-voice-toggle { width: 24px; height: 24px; top: 30px; right: 4px; }
   .dh-name-plate { font-size: 0.55rem; bottom: 44px; padding: 2px 8px; }
   .dh-img { max-width: 130%; }
+  .dh-mouth   { width: 36px; top: 46%; }
+  .dh-eye-lid { width: 22px; height: 10px; }
+  .dh-eye-left  { left: calc(50% - 26px); }
+  .dh-eye-right { left: calc(50% + 4px); }
+  .dh-eye-glint { width: 14px; height: 4px; }
+  .dh-eye-glint-left  { left: calc(50% - 22px); }
+  .dh-eye-glint-right { left: calc(50% + 8px); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .dh-image-wrap, .dh-img, .dh-pulse-ring, .dh-glint,
+  .dh-image-wrap, .dh-img, .dh-pulse-ring, .dh-mouth, .dh-mouth-inner,
+  .dh-teeth, .dh-eye-lid, .dh-eye-glint,
   .dh-emotion-indicator, .dh-bubble {
     animation: none !important;
     transition: none !important;
