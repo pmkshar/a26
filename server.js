@@ -13,10 +13,17 @@ const JWT_SECRET = process.env.JWT_SECRET || 'a26-secret-key-change-in-productio
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
 
-// Data storage
-const DATA_FILE = path.join(__dirname, 'data.json');
+// Static file serving - resolve path relative to this file so it works on Vercel
+const PUBLIC_DIR = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC_DIR));
+
+// Data storage - use /tmp on Vercel (serverless, read-only fs except /tmp)
+// On local dev, use project dir for persistence.
+const isVercel = !!process.env.VERCEL;
+const DATA_FILE = isVercel
+  ? '/tmp/a26-data.json'
+  : path.join(__dirname, 'data.json');
 
 // Initialize data
 async function initData() {
@@ -442,15 +449,22 @@ app.get('/api/admin/stats', authenticateToken, requireAdmin, async (req, res) =>
   }
 });
 
-// Serve index.html for all other routes
+// Serve index.html for all other routes (non-API, non-static)
+// Note: On Vercel, static files are served by the platform — this only runs locally.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start server
-initData().then(() => {
+// Initialize data file (idempotent - safe to call on every cold start)
+initData().catch(err => console.error('Init data error:', err));
+
+// Start HTTP server only when run directly (local dev), not when imported by Vercel serverless
+if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`A26 Server running on http://localhost:${PORT}`);
     console.log('Default admin credentials: admin / admin123');
   });
-});
+}
+
+// Export for Vercel serverless function
+module.exports = app;
