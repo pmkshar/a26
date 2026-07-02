@@ -44,17 +44,33 @@ async function initData() {
       rounds: [],
       bets: []
     };
-    await fs.writeFile(DATA_FILE, JSON.stringify(initialData, null, 2));
+    try {
+      await fs.writeFile(DATA_FILE, JSON.stringify(initialData, null, 2));
+    } catch (writeErr) {
+      console.error('Failed to write data file:', writeErr);
+    }
   }
 }
 
 async function loadData() {
-  const data = await fs.readFile(DATA_FILE, 'utf-8');
-  return JSON.parse(data);
+  // Ensure file exists before reading (handles cold-start race condition on Vercel)
+  await initData();
+  try {
+    const data = await fs.readFile(DATA_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (err) {
+    console.error('loadData error, returning default:', err.message);
+    return { users: [], players: [], rounds: [], bets: [] };
+  }
 }
 
 async function saveData(data) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
+  try {
+    await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error('saveData error:', err.message);
+    throw err;
+  }
 }
 
 // Auth middleware
