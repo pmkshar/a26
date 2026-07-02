@@ -1624,7 +1624,11 @@ body::before {
   z-index: 1;
 }
 
-/* === IMAGE WRAP (holds stacked pose images + face overlays) === */
+/* === IMAGE WRAP (v9 — single face, no left/right motion) ===
+   The dealer photo never tilts, never slides. Only subtle vertical
+   breathing and very small vertical nods are applied. This makes her
+   look like a real girl on a webcam feed, not an image being shuffled
+   around the screen. */
 .dh-image-wrap {
   position: relative;
   width: 100%;
@@ -1632,16 +1636,13 @@ body::before {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  /* Compose breathing + sway + emotion gesture into one transform.
-     --breathe (number, default 1) and --sway (angle) are set by JS timers. */
+  /* Compose breathing + nod into one transform. NO horizontal motion,
+     NO rotation. The face stays perfectly still and centered. */
   --breathe: 1;
-  --sway: 0deg;
-  --tilt: 0deg;
   --nod: 0px;
-  --zoom: 1;
-  transform: scale(var(--breathe, 1)) scale(var(--zoom, 1)) rotate(var(--sway, 0deg)) rotate(var(--tilt, 0deg)) translateY(var(--nod, 0px));
+  transform: scale(var(--breathe, 1)) translateY(var(--nod, 0px));
   transform-origin: 50% 100%;
-  transition: filter 0.5s ease, --tilt 0.5s ease, --nod 0.5s ease, --zoom 0.5s ease;
+  transition: transform 0.6s ease, filter 0.5s ease;
   z-index: 2;
 }
 
@@ -1654,60 +1655,49 @@ body::before {
 .dh-image-wrap[data-emotion="serious"]    { filter: brightness(0.98) saturate(0.96) contrast(1.02); }
 .dh-image-wrap[data-emotion="neutral"]    { filter: brightness(1.0) saturate(1.0); }
 
-/* === EMOTION GESTURES (full-image motion per emotion) === */
-/* Each gesture class drives a different combination of --tilt / --nod / --zoom
-   so the dealer visibly reacts. The .dh-image-wrap base rule above composes
-   them into one transform. */
+/* === EMOTION GESTURES (v9 — vertical motion only, no tilt) ===
+   The dealer's face never tilts or moves left/right. Emotions are
+   expressed via subtle vertical nod and brightness pulses on the
+   SAME image, so the viewer always sees one consistent face. */
 .dh-image-wrap.emo-happy     { animation: emoHappy 2.4s ease-in-out infinite; }
 .dh-image-wrap.emo-playful   { animation: emoPlayful 3.0s ease-in-out infinite; }
-.dh-image-wrap.emo-excited   { animation: emoExcited 1.0s ease-in-out infinite; }
-.dh-image-wrap.emo-ecstatic  { animation: emoEcstatic 0.6s ease-in-out infinite; }
+.dh-image-wrap.emo-excited   { animation: emoExcited 1.2s ease-in-out infinite; }
+.dh-image-wrap.emo-ecstatic  { animation: emoEcstatic 0.8s ease-in-out infinite; }
 .dh-image-wrap.emo-sad       { animation: emoSad 4.0s ease-in-out infinite; }
 .dh-image-wrap.emo-serious   { animation: emoSerious 5.0s ease-in-out infinite; }
 .dh-image-wrap.emo-neutral   { animation: none; }
 
 @keyframes emoHappy {
-  0%, 100% { --tilt: 0deg;   --nod: 0px;  --zoom: 1; }
-  50%      { --tilt: 1.5deg; --nod: -2px; --zoom: 1.005; }
+  0%, 100% { --nod: 0px;  filter: brightness(1.05) saturate(1.05); }
+  50%      { --nod: -1px; filter: brightness(1.07) saturate(1.07); }
 }
 @keyframes emoPlayful {
-  0%, 100% { --tilt: -2deg;  --nod: 0px; }
-  50%      { --tilt: 2deg;   --nod: -1px; }
+  0%, 100% { --nod: 0px;  filter: brightness(1.06) saturate(1.08); }
+  50%      { --nod: -1px; filter: brightness(1.08) saturate(1.10); }
 }
 @keyframes emoExcited {
-  0%, 100% { --nod: 0px;  --zoom: 1; }
-  25%      { --nod: -3px; --zoom: 1.015; }
-  50%      { --nod: 0px;  --zoom: 1; }
-  75%      { --nod: -3px; --zoom: 1.015; }
+  0%, 100% { --nod: 0px;  filter: brightness(1.10) saturate(1.12) contrast(1.02); }
+  25%      { --nod: -2px; filter: brightness(1.12) saturate(1.14) contrast(1.03); }
+  50%      { --nod: 0px;  filter: brightness(1.10) saturate(1.12) contrast(1.02); }
+  75%      { --nod: -2px; filter: brightness(1.12) saturate(1.14) contrast(1.03); }
 }
 @keyframes emoEcstatic {
-  0%, 100% { --nod: 0px;  --zoom: 1; }
-  50%      { --nod: -4px; --zoom: 1.025; }
+  0%, 100% { --nod: 0px;  filter: brightness(1.14) saturate(1.18) contrast(1.04); }
+  50%      { --nod: -3px; filter: brightness(1.18) saturate(1.22) contrast(1.06); }
 }
 @keyframes emoSad {
-  0%, 100% { --tilt: 0deg;  --nod: 2px; }
-  50%      { --tilt: -1deg; --nod: 3px; }
+  0%, 100% { --nod: 1px;  filter: brightness(0.96) saturate(0.92); }
+  50%      { --nod: 2px;  filter: brightness(0.94) saturate(0.90); }
 }
 @keyframes emoSerious {
-  0%, 100% { --tilt: 0deg; --nod: 0px; }
-  50%      { --tilt: 0.5deg; --nod: 1px; }
+  0%, 100% { --nod: 0px;  filter: brightness(0.98) saturate(0.96) contrast(1.02); }
+  50%      { --nod: 1px;  filter: brightness(0.97) saturate(0.95) contrast(1.03); }
 }
 
-/* Note: CSS custom properties don't interpolate by default; register them
-   so the @keyframes above actually transition smoothly. */
-@property --tilt {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
+/* Register --nod so the keyframes interpolate smoothly */
 @property --nod {
   syntax: '<length>';
   initial-value: 0px;
-  inherits: false;
-}
-@property --zoom {
-  syntax: '<number>';
-  initial-value: 1;
   inherits: false;
 }
 
@@ -1716,7 +1706,7 @@ body::before {
   display: none !important;
 }
 
-/* === SINGLE FACE IMAGE (v8 — one consistent dealer face) === */
+/* === SINGLE FACE IMAGE (v9 — one consistent live-girl portrait) === */
 .dh-face-img {
   position: absolute;
   bottom: 0;
@@ -1726,56 +1716,34 @@ body::before {
   width: auto;
   max-width: 115%;
   object-fit: cover;
-  object-position: center 18%;
+  object-position: center 20%;
   opacity: 1;
   pointer-events: none;
-  will-change: transform, filter;
+  will-change: filter;
 }
 
-/* === POSE TRANSFORMS (applied to .dh-image-wrap via .pose-* classes) ===
-   The face image never changes — poses are CSS transforms that
-   tilt/scale/shift the same image to simulate dealer actions. */
-.dh-image-wrap.pose-idle {
-  --tilt: 0deg;
-  --nod: 0px;
-  --zoom: 1;
-}
-.dh-image-wrap.pose-shuffling {
-  animation: poseShuffle 1.2s ease-in-out;
-}
-.dh-image-wrap.pose-cutting {
-  --tilt: -2deg;
-  --nod: 5px;
-  --zoom: 1.01;
-}
-.dh-image-wrap.pose-dealing {
-  --tilt: 1deg;
-  --nod: -3px;
-  --zoom: 1.02;
-}
-.dh-image-wrap.pose-reveal-win {
-  --tilt: 0deg;
-  --nod: -5px;
-  --zoom: 1.03;
-  animation: poseWinPulse 0.8s ease-out;
-}
+/* === POSE CLASSES (v9 — NO image transforms) ===
+   In v9 poses do NOT move the image. The dealer's face stays perfectly
+   still and centered at all times — like a real live girl on a webcam.
+   Pose classes are kept for API compatibility but have no visual effect
+   on the image itself. The spotlight / pulse ring may shift colour
+   slightly to indicate state. */
+.dh-image-wrap.pose-idle,
+.dh-image-wrap.pose-shuffling,
+.dh-image-wrap.pose-cutting,
+.dh-image-wrap.pose-dealing,
+.dh-image-wrap.pose-reveal-win,
 .dh-image-wrap.pose-reveal-lose {
-  --tilt: -1deg;
-  --nod: 8px;
-  --zoom: 0.99;
+  /* No image transform — face stays still */
 }
+
+/* Subtle spotlight colour shift per pose (does NOT move the image) */
+.dh-image-wrap.pose-reveal-win  { filter: brightness(1.08) saturate(1.08); }
+.dh-image-wrap.pose-reveal-lose { filter: brightness(0.95) saturate(0.94); }
 
 @keyframes poseShuffle {
-  0%   { --tilt: 0deg; --nod: 0px; }
-  25%  { --tilt: 2deg; --nod: 3px; }
-  50%  { --tilt: -2deg; --nod: -2px; }
-  75%  { --tilt: 1deg; --nod: 4px; }
-  100% { --tilt: 0deg; --nod: 0px; }
-}
-@keyframes poseWinPulse {
-  0%   { --zoom: 1; }
-  50%  { --zoom: 1.05; }
-  100% { --zoom: 1.03; }
+  0%, 100% { transform: scale(var(--breathe, 1)) translateY(var(--nod, 0px)); }
+  50%      { transform: scale(var(--breathe, 1)) translateY(calc(var(--nod, 0px) - 1px)); }
 }
 
 /* Vignette overlay for cinematic depth */
@@ -1938,54 +1906,82 @@ body::before {
   display: none !important;
 }
 
-/* === SVG MOUTH OVERLAY (precise viseme morphing) === */
-/* A single SVG mouth sits on top of the static dealer face photo.
-   The SVG <path> elements morph between 7 viseme shapes (rest, closed,
-   small, medium, wide, O, smile) with a 160ms CSS transition, producing
-   smooth, accurate lip motion that matches the rhythm of speech.
-   This replaces the old AI-generated mouth variant flip-book which
-   caused whole-face jitter between frames. */
-.dh-mouth-overlay {
+/* === SOFT MOUTH OVERLAY (v9 — radial gradient that blends with photo) ===
+   A soft, dark, radial-gradient ellipse positioned over the dealer's
+   mouth. The inner ellipse scales vertically (--mouth-scale) and fades
+   in/out (--mouth-opacity) to mimic the jaw opening and closing as she
+   speaks. The gradient has soft edges so it reads as a real mouth
+   opening on the photo, not as a hard cartoon shape.
+   --mouth-scale and --mouth-opacity are driven by JS (lip-sync engine). */
+.dh-mouth-soft {
   position: absolute;
-  /* Position the mouth on the lower-center of the face where lips
-     naturally appear on the dealer portrait. Tuned for the 768x1344
-     photorealistic dealer images. */
-  bottom: 30%;
+  /* Position the mouth over the lower-center of the face where the
+     dealer's lips naturally appear on the portrait photo. Tuned for
+     the 768x1344 photorealistic dealer image (Priya). */
+  bottom: 31%;
   left: 50%;
-  transform: translateX(-50%) translateY(var(--jaw-drop, 0px));
-  width: 18%;
-  max-width: 140px;
-  min-width: 70px;
-  height: auto;
+  transform: translateX(-50%) scaleY(var(--mouth-scale, 0.15));
+  transform-origin: 50% 30%;
+  width: 13%;
+  max-width: 110px;
+  min-width: 60px;
+  height: 22px;
   pointer-events: none;
   z-index: 8;
-  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
-  transition: transform 0.16s ease-out;
+  opacity: var(--mouth-opacity, 0.25);
+  filter: blur(0.8px);
+  transition: transform 0.09s ease-out, opacity 0.12s ease-out;
 }
-.dh-mouth-svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  overflow: visible;
+
+/* Inner dark-red mouth cavity — a soft radial gradient ellipse */
+.dh-mouth-soft-inner {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 35%,
+    rgba(60, 8, 18, 0.95) 0%,
+    rgba(80, 14, 24, 0.85) 35%,
+    rgba(100, 24, 36, 0.45) 65%,
+    rgba(120, 40, 50, 0.0) 100%);
+  border-radius: 50% 50% 45% 45%;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
 }
-/* Smooth morph transition on the path shapes */
+
+/* Teeth: a thin white horizontal strip at the top of the open mouth,
+   visible only when the mouth is open enough (--mouth-scale high) */
+.dh-teeth-soft {
+  position: absolute;
+  top: 8%;
+  left: 12%;
+  right: 12%;
+  height: 3px;
+  background: linear-gradient(180deg, rgba(250,248,240,0.95), rgba(220,212,200,0.75));
+  border-radius: 50% 50% 30% 30%;
+  opacity: 0;
+  transition: opacity 0.1s ease-out;
+  filter: blur(0.4px);
+}
+
+/* Mouth overlay is barely visible when idle, full opacity when speaking.
+   The .speaking class is toggled on .dh-image-wrap by JS. */
+.dh-image-wrap .dh-mouth-soft {
+  opacity: 0.18;
+  transition: opacity 0.3s ease, transform 0.09s ease-out;
+}
+.dh-image-wrap.speaking .dh-mouth-soft {
+  opacity: var(--mouth-opacity, 0.6);
+}
+
+/* Legacy SVG mouth overlay — hidden, replaced by .dh-mouth-soft in v9 */
+.dh-mouth-overlay,
+.dh-mouth-svg,
 .dh-mouth-outer,
 .dh-mouth-inner,
 .dh-mouth-teeth {
-  transition: d 0.16s ease-out, opacity 0.16s ease-out;
-}
-/* Mouth overlay is subtle when idle, full opacity when speaking.
-   The .speaking class is toggled on .dh-image-wrap by JS. */
-.dh-image-wrap .dh-mouth-overlay {
-  opacity: 0.5;
-  transition: opacity 0.3s ease;
-}
-.dh-image-wrap.speaking .dh-mouth-overlay {
-  opacity: 1;
+  display: none !important;
 }
 
-/* Legacy mouth-img (AI variants) — kept hidden, replaced by SVG overlay */
-.dh-mouth-img { display: none !important; }
+/* Legacy mouth-img (AI variants) — hidden */
+.dh-mouth-img,
 .dh-mouth { display: none !important; }
 
 /* === SPEECH BUBBLE === */

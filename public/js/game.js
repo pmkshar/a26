@@ -476,8 +476,11 @@ async function dealNow() {
   const deck = createDeck();
   const drawn = [deck[0], deck[1], deck[2]];
 
-  // 4. Reveal each card one by one (wait for each narration)
-  const cardSayKeys = ['card1', 'card2', 'card3'];
+  // 4. Reveal all three cards at normal speed (no long narration gaps).
+  //    The dealer has already said "Now drawing three cards" above.
+  //    During the reveal we just flip the cards one by one with a brief,
+  //    natural 350ms cadence — no per-card speech that would slow the
+  //    reveal or cause voice overlap.
   for (let i = 0; i < 3; i++) {
     const slot = document.getElementById('slot' + (i + 1));
     slot.classList.add('revealed');
@@ -495,10 +498,17 @@ async function dealNow() {
         </div>
       </div>
     `;
-    // Pulse the matching houses
+    // Pulse the matching houses for visual feedback
     highlightMatchingHouses(card.value);
-    if (dhReady) await DigitalHuman.sayAndWait(cardSayKeys[i]);
+    // Brief natural pause between card flips — no per-card narration
+    await delay(350);
     clearHouseHighlights();
+  }
+
+  // Wait for the dealer's "drawing three cards" line to finish before
+  // announcing the result, so voice doesn't overlap.
+  if (dhReady) {
+    while (DigitalHuman.isSpeaking()) { await delay(120); }
   }
 
   // 5. Calculate results
@@ -512,12 +522,16 @@ async function dealNow() {
   bettedHouses.forEach(h => {
     const matchCount = drawn.filter(c => c.value === h).length;
     if (matchCount > 0) {
-      let multiplier = 0;
+      // Payout table per user spec:
+      //   1 match  -> 1:1 -> total return = bet x 2 (profit = bet x 1)
+      //   2 matches-> 1:2 -> total return = bet x 3 (profit = bet x 2)
+      //   3 matches-> 1:4 -> total return = bet x 4 (profit = bet x 3)
+      let multiplier = 0;   // PROFIT multiplier (excludes original stake)
       let ratio = '';
       if (matchCount === 1) { multiplier = 1; ratio = '1:1'; }
       else if (matchCount === 2) { multiplier = 2; ratio = '1:2'; }
-      else if (matchCount === 3) { multiplier = 4; ratio = '1:4'; }
-      const win = bets[h] * (1 + multiplier); // return stake + winnings
+      else if (matchCount === 3) { multiplier = 3; ratio = '1:4'; }
+      const win = bets[h] * (1 + multiplier); // stake + profit
       totalWin += win;
       if (matchCount > bestMatchCount) bestMatchCount = matchCount;
       resultDetails.push(`House ${h}: ${matchCount} match${matchCount > 1 ? 'es' : ''} (${ratio}) = +₹${(bets[h] * multiplier).toLocaleString('en-IN')}`);
