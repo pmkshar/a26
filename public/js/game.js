@@ -34,6 +34,8 @@ let betTimerInterval = null;
 let betWindowStart = 0;
 let lastWin = 0;
 let videoClockInterval = null;
+let dhReady = false;
+let idleChatInterval = null;
 
 // === INIT ===
 document.addEventListener('DOMContentLoaded', async () => {
@@ -46,14 +48,39 @@ document.addEventListener('DOMContentLoaded', async () => {
   initHouses();
   initChips();
   initBetTiles();
-  initDealerSwitch();
   initButtons();
   startVideoClock();
   initScoreboard();
 
+  // Initialize the AI Digital Human dealer
+  try {
+    DigitalHuman.init('dhContainer');
+    dhReady = true;
+    DigitalHuman.setPose('idle');
+    // Welcome line after slight delay (let voices load)
+    setTimeout(() => {
+      DigitalHuman.say('welcome');
+      DigitalHuman.gesture('wave');
+    }, 800);
+    // Idle chatter
+    startIdleChatter();
+  } catch (e) {
+    console.warn('Digital Human init failed:', e);
+  }
+
   // Begin first betting window
   startBettingWindow();
 });
+
+// === IDLE CHATTER (LLM-style contextual banter) ===
+function startIdleChatter() {
+  if (idleChatInterval) clearInterval(idleChatInterval);
+  idleChatInterval = setInterval(() => {
+    if (isBettingOpen && !isDealing && dhReady) {
+      DigitalHuman.say('idle');
+    }
+  }, 18000); // every 18s when idle
+}
 
 // === VIDEO CLOCK (decorative, runs always) ===
 function startVideoClock() {
@@ -152,10 +179,12 @@ function placeBet(house, amount) {
   if (!isBettingOpen || isDealing) return;
   if (amount < MIN_BET || amount > MAX_BET) {
     flashMessage(`Bet must be between ₹${MIN_BET} and ₹${MAX_BET}`);
+    if (dhReady) DigitalHuman.sayCustom(`Bet must be between ${MIN_BET} and ${MAX_BET} rupees.`, 'serious', 0.98, 0.98);
     return;
   }
   if (balance < amount) {
     flashMessage('Insufficient balance');
+    if (dhReady) DigitalHuman.sayCustom('Insufficient balance. Please top up to continue.', 'sad', 0.96, 0.98);
     return;
   }
   bets[house] = (bets[house] || 0) + amount;
@@ -175,6 +204,8 @@ function placeBet(house, amount) {
   const houseEl = document.querySelector(`.house[data-house="${house}"]`);
   houseEl.classList.add('pulse');
   setTimeout(() => houseEl.classList.remove('pulse'), 400);
+  // Dealer acknowledges bet
+  if (dhReady) DigitalHuman.say('betPlaced');
 }
 
 function renderChipsOnHouse(house) {
@@ -201,34 +232,17 @@ function initBetTiles() {
   // No separate bet tiles in A26 - houses are the bet tiles
 }
 
-// === DEALER SWITCH ===
-function initDealerSwitch() {
-  document.querySelectorAll('.dealer-pill').forEach(p => {
-    p.addEventListener('click', () => {
-      if (isDealing) return;
-      document.querySelectorAll('.dealer-pill').forEach(x => x.classList.remove('active'));
-      p.classList.add('active');
-      currentDealer = parseInt(p.dataset.dealer);
-      setDealerPose('idle');
-    });
-  });
-}
-
+// === DEALER (now powered by Digital Human) ===
 function setDealerPose(pose) {
-  const img = document.getElementById('dealerFrame');
-  // dealer2 doesn't have a reveal pose generated; fallback to dealing
-  const actualPose = (currentDealer === 2 && pose === 'reveal') ? 'dealing' : pose;
-  img.src = `/images/dealers/dealer${currentDealer}_${actualPose}.png`;
-  img.dataset.current = actualPose;
+  if (!dhReady) return;
+  // Map legacy pose names to digital-human poses
+  const map = { idle: 'idle', cutting: 'cutting', dealing: 'dealing', reveal: 'reveal-win' };
+  DigitalHuman.setPose(map[pose] || pose);
 }
 
 function setDealerBubble(text) {
-  const bubble = document.getElementById('dealerBubble');
-  bubble.textContent = text;
-  // Restart animation
-  bubble.style.animation = 'none';
-  bubble.offsetHeight; // trigger reflow
-  bubble.style.animation = '';
+  if (!dhReady) return;
+  DigitalHuman.setBubble(text);
 }
 
 // === CLEAR BETS ===
@@ -278,6 +292,10 @@ function startBettingWindow() {
     const elapsed = Date.now() - betWindowStart;
     const remaining = Math.max(0, Math.ceil((BET_WINDOW_MS - elapsed) / 1000));
     document.getElementById('betTimer').textContent = remaining;
+    // Bet-closing warning at 5s
+    if (remaining === 5 && dhReady && totalBet > 0) {
+      DigitalHuman.say('betClosed');
+    }
     if (remaining <= 0) {
       clearInterval(betTimerInterval);
       // Auto-deal if any bets placed
@@ -351,26 +369,29 @@ async function dealNow() {
   document.getElementById('resultBanner').className = 'result-banner';
 
   // === ANIMATION SEQUENCE ===
-  // 1. Dealer cuts the deck (a player cuts the cards)
-  setDealerBubble('Shuffling the deck');
+  // 1. Dealer shuffles the deck
+  if (dhReady) DigitalHuman.say('shuffling');
   setDealerPose('cutting');
   animateDeckShuffle();
-  await delay(900);
+  await delay(1200);
 
   // 2. A player cuts the cards
-  setDealerBubble('A player cuts the cards');
-  await delay(700);
+  if (dhReady) DigitalHuman.say('cutDeck');
+  await delay(1000);
 
   // 3. Build deck and draw 3 cards
-  setDealerBubble('Drawing 3 cards');
+  if (dhReady) DigitalHuman.say('drawing');
   setDealerPose('dealing');
+  await delay(400);
 
   const deck = createDeck();
   const drawn = [deck[0], deck[1], deck[2]];
 
   // 4. Reveal each card one by one
+  const cardSayKeys = ['card1', 'card2', 'card3'];
   for (let i = 0; i < 3; i++) {
-    await delay(500);
+    await delay(700);
+    if (dhReady) DigitalHuman.say(cardSayKeys[i]);
     const slot = document.getElementById('slot' + (i + 1));
     slot.classList.add('revealed');
     const card = drawn[i];
@@ -387,20 +408,20 @@ async function dealNow() {
         </div>
       </div>
     `;
+    if (dhReady) DigitalHuman.gesture('deal-card');
     // Pulse the matching houses
     highlightMatchingHouses(card.value);
-    await delay(400);
+    await delay(500);
     clearHouseHighlights();
   }
 
   // 5. Calculate results
-  setDealerBubble('Calculating wins');
-  setDealerPose('reveal');
-  await delay(500);
+  await delay(400);
 
   const bettedHouses = Object.keys(bets);
   let totalWin = 0;
   const resultDetails = [];
+  let bestMatchCount = 0;
 
   bettedHouses.forEach(h => {
     const matchCount = drawn.filter(c => c.value === h).length;
@@ -412,6 +433,7 @@ async function dealNow() {
       else if (matchCount === 3) { multiplier = 4; ratio = '1:4'; }
       const win = bets[h] * (1 + multiplier); // return stake + winnings
       totalWin += win;
+      if (matchCount > bestMatchCount) bestMatchCount = matchCount;
       resultDetails.push(`House ${h}: ${matchCount} match${matchCount > 1 ? 'es' : ''} (${ratio}) = +₹${(bets[h] * multiplier).toLocaleString('en-IN')}`);
     } else {
       resultDetails.push(`House ${h}: No match`);
@@ -423,6 +445,19 @@ async function dealNow() {
       }
     });
   });
+
+  // Set dealer pose + emotion based on outcome
+  if (dhReady) {
+    if (totalWin > 0) {
+      DigitalHuman.setPose('reveal-win');
+      if (bestMatchCount === 3) DigitalHuman.say('win3');
+      else if (bestMatchCount === 2) DigitalHuman.say('win2');
+      else DigitalHuman.say('win1');
+    } else {
+      DigitalHuman.setPose('reveal-lose');
+      DigitalHuman.say('lose');
+    }
+  }
 
   balance += totalWin;
   lastWin = totalWin;
@@ -454,7 +489,7 @@ async function dealNow() {
     md.className = 'matches-display show lose';
   }
 
-  setDealerBubble(totalWin > 0 ? `You won ₹${totalWin.toLocaleString('en-IN')}!` : 'Better luck next round');
+  if (!dhReady) setDealerBubble(totalWin > 0 ? `You won ₹${totalWin.toLocaleString('en-IN')}!` : 'Better luck next round');
 
   // Save history
   history.unshift({

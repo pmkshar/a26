@@ -48,11 +48,9 @@
         <span class="video-clock" id="videoClock">00:00:00</span>
       </div>
 
-      <!-- Dealer image stack (poses swap to create motion) -->
+      <!-- AI Digital Human Dealer (3D-styled SVG humanoid with voice) -->
       <div class="dealer-stage" id="dealerStage">
-        <img src="/images/dealers/dealer1_idle.png" alt="Dealer Priya" class="dealer-frame" id="dealerFrame" data-current="idle">
-        <!-- Speech / status bubble -->
-        <div class="dealer-bubble" id="dealerBubble">Place your bets</div>
+        <div class="dh-container" id="dhContainer"></div>
       </div>
 
       <!-- Deck visual on the table -->
@@ -65,10 +63,9 @@
       <!-- Floating cut-card animation overlay -->
       <div class="cut-overlay" id="cutOverlay"></div>
 
-      <!-- Dealer selector -->
+      <!-- Dealer name plate -->
       <div class="dealer-switch">
-        <button class="dealer-pill active" data-dealer="1">Priya</button>
-        <button class="dealer-pill" data-dealer="2">Ananya</button>
+        <span class="dealer-name-plate">Priya · AI Digital Dealer</span>
       </div>
 
       <!-- Bottom bet status -->
@@ -196,6 +193,7 @@
 </div>
 
 <script src="/js/auth.js"></script>
+<script src="/js/digital-human.js"></script>
 <script src="/js/game.js"></script>
 <script>
 // PWA service worker registration
