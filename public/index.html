@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="/images/a26-logo.svg">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=dh12">
+<link rel="stylesheet" href="/css/style.css?v=dh13">
 </head>
 <body>
 
@@ -29,9 +29,10 @@
     <span class="nav-balance" id="nav-balance">₹0</span>
     <span class="nav-mode-badge" id="navModeBadge" style="display:none;">TRIAL</span>
     <div class="nav-links">
+      <a href="#" id="nav-howto" class="nav-howto-link">How to Play</a>
       <a href="/dashboard.html" class="hide-mobile" id="nav-dashboard" style="display:none;">Dashboard</a>
       <a href="/admin.html" class="hide-mobile" id="nav-admin" style="display:none;">Admin</a>
-      <a href="/login.html" id="nav-login" style="display:none;">Login / Register</a>
+      <a href="/login.html" id="nav-login" class="nav-login-cta">Login / Register</a>
       <a href="#" id="nav-logout" style="display:none;">Logout</a>
     </div>
   </div>
@@ -232,26 +233,27 @@
 </div>
 
 <!-- RULES -->
-<button class="rules-toggle" id="btnRules" aria-label="Rules">?</button>
+<button class="rules-toggle" id="btnRules" aria-label="How to Play" title="How to Play">?</button>
 <div class="rules-panel" id="rulesPanel">
   <h3>How to Play A26</h3>
   <p><strong>1.</strong> Six houses on the table: <strong>A, 2, 3, 4, 5, 6</strong>.</p>
-  <p><strong>2.</strong> Select one or more houses and bet between <strong>₹2,000</strong> and <strong>₹60,000</strong> per house. You can bet on multiple houses in the same round — each house has its own independent ₹60,000 cap.</p>
-  <p><strong>3.</strong> The dealer shuffles the deck, lets a player cut, then draws <strong>3 random cards</strong>.</p>
-  <p><strong>4.</strong> If a card's value matches the house you bet on, you win!</p>
+  <p><strong>2.</strong> The A26 deck has only <strong>A through 6</strong> across all 4 suits (24 cards). No 7-K in this deck.</p>
+  <p><strong>3.</strong> Select one or more houses and bet between <strong>₹2,000</strong> and <strong>₹60,000</strong> per house. You can bet on multiple houses in the same round — each house has its own independent ₹60,000 cap.</p>
+  <p><strong>4.</strong> The dealer shuffles the deck, lets a player cut, then draws <strong>3 random cards</strong>.</p>
+  <p><strong>5.</strong> If a card's value matches the house you bet on, you win!</p>
   <table class="payout-table">
     <tr><td>1 Match</td><td>1 : 1</td></tr>
     <tr><td>2 Matches</td><td>1 : 2</td></tr>
     <tr><td>3 Matches</td><td>1 : 4</td></tr>
   </table>
   <p><strong>Example:</strong> Bet ₹2,000 on house "A". If 1 of the 3 cards is an Ace, you win ₹4,000 (1:1). If 2 are Aces, you win ₹6,000 (1:2). If all 3 are Aces, you win ₹8,000 (1:4).</p>
-  <p><strong>Card Values:</strong> A = Ace · 2-10 = face value · J, Q, K count as their rank only when house matches.</p>
+  <p><strong>Guests:</strong> Play the trial freely with unlimited coins. To place real bets, register a free account.</p>
 </div>
 
-<script src="/js/auth.js?v=dh12"></script>
-<script src="/js/digital-human.js?v=dh12"></script>
-<script src="/js/live-activity.js?v=dh12"></script>
-<script src="/js/game.js?v=dh12"></script>
+<script src="/js/auth.js?v=dh13"></script>
+<script src="/js/digital-human.js?v=dh13"></script>
+<script src="/js/live-activity.js?v=dh13"></script>
+<script src="/js/game.js?v=dh13"></script>
 <script>
 // PWA service worker registration
 if ('serviceWorker' in navigator) {
@@ -259,6 +261,18 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
   });
 }
+
+// Top-nav "How to Play" link opens the same rules panel as the floating ? button
+(function() {
+  var navHowto = document.getElementById('nav-howto');
+  var rulesPanel = document.getElementById('rulesPanel');
+  if (navHowto && rulesPanel) {
+    navHowto.addEventListener('click', function(e) {
+      e.preventDefault();
+      rulesPanel.classList.toggle('show');
+    });
+  }
+})();
 </script>
 </body>
 </html>

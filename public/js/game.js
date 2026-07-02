@@ -11,7 +11,9 @@ Auth.updateNav();
 
 // === CONSTANTS ===
 const HOUSES = ['A', '2', '3', '4', '5', '6'];
-const CARD_VALUES = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+// A26 deck: ONLY A, 2, 3, 4, 5, 6 across all 4 suits (24 cards total).
+// No 7-K — the houses on the table only range A..6, so the deck matches.
+const CARD_VALUES = ['A','2','3','4','5','6'];
 const SUITS = [
   { sym: '\u2660', color: 'black' }, // spade
   { sym: '\u2665', color: 'red' },   // heart
@@ -583,7 +585,7 @@ async function dealNow() {
   for (let i = 1; i <= 3; i++) {
     const slot = document.getElementById('slot' + i);
     slot.classList.remove('revealed', 'match');
-    slot.innerHTML = '<div class="drawn-card-back">A26</div>';
+    slot.innerHTML = '<div class="drawn-card-back"><span class="card-back-monogram">A26</span></div>';
   }
   document.getElementById('matchesDisplay').innerHTML = '';
   document.getElementById('resultBanner').textContent = '';
@@ -622,7 +624,10 @@ async function dealNow() {
           <div class="dc-rank">${card.value}</div>
           <div class="dc-suit-sm">${card.suit}</div>
         </div>
-        <div class="dc-center">${card.suit}</div>
+        <div class="dc-center">
+          <div class="dc-center-suit">${card.suit}</div>
+          <div class="dc-watermark">A26</div>
+        </div>
         <div class="dc-corner bottom">
           <div class="dc-rank">${card.value}</div>
           <div class="dc-suit-sm">${card.suit}</div>
@@ -857,7 +862,7 @@ function resetRound() {
   for (let i = 1; i <= 3; i++) {
     const slot = document.getElementById('slot' + i);
     slot.classList.remove('revealed', 'match');
-    slot.innerHTML = '<div class="drawn-card-back">A26</div>';
+    slot.innerHTML = '<div class="drawn-card-back"><span class="card-back-monogram">A26</span></div>';
   }
   document.getElementById('matchesDisplay').innerHTML = '';
   document.getElementById('matchesDisplay').className = 'matches-display';

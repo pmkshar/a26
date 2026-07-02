@@ -318,17 +318,54 @@ body::before {
   font-size: 0.85rem;
 }
 
-.nav-links { display: flex; gap: 12px; }
+.nav-links { display: flex; gap: 12px; align-items: center; }
 
 .nav-links a {
   color: var(--gold);
   text-decoration: none;
   font-size: 0.8rem;
   font-weight: 600;
-  transition: color 0.3s;
+  transition: color 0.3s, background 0.2s;
 }
 
 .nav-links a:hover { color: var(--gold-light); }
+
+/* "How to Play" — soft outlined button in the top-nav corner */
+.nav-howto-link {
+  padding: 6px 12px !important;
+  border: 1px solid var(--gold);
+  border-radius: 16px;
+  font-size: 0.74rem !important;
+  letter-spacing: 0.5px;
+  background: rgba(212,168,67,0.08);
+}
+.nav-howto-link:hover {
+  background: rgba(212,168,67,0.18) !important;
+}
+
+/* "Login / Register" — primary gold CTA in the top-right corner */
+.nav-login-cta {
+  padding: 6px 14px !important;
+  border-radius: 16px;
+  font-size: 0.78rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, var(--gold), var(--gold-light)) !important;
+  color: #021a0e !important;
+  border: 1px solid rgba(255,255,255,0.25);
+  box-shadow: 0 2px 8px rgba(212,168,67,0.35);
+  text-shadow: none;
+}
+.nav-login-cta:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 3px 12px rgba(212,168,67,0.5);
+  color: #021a0e !important;
+}
+
+@media (max-width: 600px) {
+  .nav-howto-link { padding: 4px 9px !important; font-size: 0.66rem !important; }
+  .nav-login-cta  { padding: 5px 11px !important; font-size: 0.7rem !important; }
+}
 
 /* === NAV MODE BADGE (TRIAL / REAL) === */
 .nav-mode-badge {
@@ -695,9 +732,27 @@ body::before {
   position: absolute;
   inset: 0;
   border-radius: 6px;
-  background: repeating-linear-gradient(45deg, #8b0000, #8b0000 4px, #600 4px, #600 8px);
-  border: 2px solid var(--gold-dark);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.4);
+  background:
+    radial-gradient(circle at center, rgba(212,168,67,0.25) 0%, transparent 60%),
+    repeating-linear-gradient(45deg, #8b0000 0, #8b0000 4px, #5a0000 4px, #5a0000 8px);
+  border: 2px solid var(--gold);
+  box-shadow: inset 0 0 0 1px rgba(240,214,138,0.4), 0 2px 4px rgba(0,0,0,0.4);
+}
+
+/* Small A26 monogram on the top deck card */
+.deck-stack .deck-card:nth-child(1)::after {
+  content: 'A26';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  color: var(--gold-light);
+  font-size: 0.55rem;
+  letter-spacing: 1px;
+  font-weight: 900;
+  text-shadow: 0 0 4px rgba(0,0,0,0.7);
 }
 
 .deck-stack .deck-card:nth-child(2) { transform: translate(2px, -2px); }
@@ -786,8 +841,8 @@ body::before {
 }
 
 .drawn-card-slot {
-  width: 60px;
-  height: 84px;
+  width: 66px;
+  height: 92px;
   perspective: 600px;
   border-radius: 8px;
   position: relative;
@@ -798,28 +853,79 @@ body::before {
   width: 100%;
   height: 100%;
   border-radius: 6px;
-  background: repeating-linear-gradient(45deg, #8b0000, #8b0000 4px, #600 4px, #600 8px);
-  border: 2px solid var(--gold-dark);
+  background:
+    radial-gradient(circle at center, rgba(212,168,67,0.35) 0%, transparent 55%),
+    repeating-linear-gradient(45deg, #8b0000 0, #8b0000 5px, #5a0000 5px, #5a0000 10px);
+  border: 2px solid var(--gold);
+  box-shadow: inset 0 0 0 1px rgba(240,214,138,0.45), 0 2px 6px rgba(0,0,0,0.5);
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.drawn-card-back::before,
+.drawn-card-back::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border: 1px solid rgba(240,214,138,0.5);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.card-back-monogram {
   font-family: var(--font-display);
-  color: var(--gold);
-  font-size: 0.7rem;
-  letter-spacing: 1px;
+  color: var(--gold-light);
+  font-size: 0.78rem;
+  letter-spacing: 2px;
+  font-weight: 900;
+  text-shadow: 0 0 8px rgba(212,168,67,0.85), 0 1px 2px rgba(0,0,0,0.7);
+  z-index: 2;
+  padding: 3px 6px;
+  border: 1px solid var(--gold);
+  border-radius: 4px;
+  background: rgba(0,0,0,0.4);
 }
 
 .drawn-card-face {
   width: 100%;
   height: 100%;
   border-radius: 6px;
-  background: var(--card-white);
-  border: 1px solid #ccc;
+  background:
+    linear-gradient(135deg, #fffdf3 0%, var(--card-white) 60%, #f3ead0 100%);
+  border: 2px solid var(--gold);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,0.6),
+    inset 0 0 8px rgba(212,168,67,0.18),
+    0 2px 6px rgba(0,0,0,0.4);
   display: flex;
   flex-direction: column;
   padding: 4px;
   position: relative;
   animation: cardReveal 0.5s ease-out;
+  overflow: hidden;
+}
+
+/* Decorative gold inner frame on each A26 card */
+.drawn-card-face::before {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(212,168,67,0.45);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+/* Faint diagonal gold sheen in the background of every A26 card */
+.drawn-card-face::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, transparent 40%, rgba(212,168,67,0.18) 50%, transparent 60%);
+  pointer-events: none;
 }
 
 @keyframes cardReveal {
@@ -836,16 +942,46 @@ body::before {
   align-items: center;
   line-height: 1;
   font-weight: 800;
+  z-index: 2;
 }
 
 .dc-corner.top { align-self: flex-start; }
 .dc-corner.bottom { align-self: flex-end; transform: rotate(180deg); }
-.dc-rank { font-size: 0.95rem; }
+.dc-rank {
+  font-size: 0.95rem;
+  text-shadow: 0 1px 0 rgba(212,168,67,0.25);
+}
 .dc-suit-sm { font-size: 0.8rem; }
 .dc-center {
-  font-size: 1.6rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
   margin: -4px 0;
-  text-align: center;
+  z-index: 2;
+}
+.dc-center-suit {
+  font-size: 1.7rem;
+  line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.18));
+}
+/* A26 branding watermark — sits subtly behind/under the suit pip */
+.dc-watermark {
+  position: absolute;
+  bottom: -2px;
+  font-family: var(--font-display);
+  font-size: 0.5rem;
+  letter-spacing: 1.5px;
+  color: var(--gold-dark);
+  opacity: 0.75;
+  font-weight: 900;
+  background: rgba(212,168,67,0.15);
+  border: 1px solid rgba(139,105,20,0.55);
+  border-radius: 3px;
+  padding: 1px 4px;
+  line-height: 1;
 }
 
 .drawn-card-slot.match {
@@ -2089,10 +2225,12 @@ body::before {
   .bet-timer { font-size: 1.1rem; }
   .deck-stack { width: 38px; height: 54px; bottom: 16%; right: 8%; }
 
-  .drawn-card-slot { width: 50px; height: 70px; }
-  .dc-rank { font-size: 0.8rem; }
+  .drawn-card-slot { width: 54px; height: 76px; }
+  .dc-rank { font-size: 0.85rem; }
   .dc-suit-sm { font-size: 0.7rem; }
-  .dc-center { font-size: 1.3rem; }
+  .dc-center-suit { font-size: 1.4rem; }
+  .dc-watermark { font-size: 0.45rem; padding: 1px 3px; }
+  .card-back-monogram { font-size: 0.65rem; }
 
   .house { padding: 10px 4px 6px; min-height: 80px; gap: 3px; }
   .house-label { font-size: 1.4rem; }
