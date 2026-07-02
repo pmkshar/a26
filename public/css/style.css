@@ -761,6 +761,41 @@ body::before {
   background: linear-gradient(180deg, rgba(212,168,67,0.22), rgba(0,0,0,0.2));
 }
 
+/* House that has at least one bet placed on it */
+.house.has-bet {
+  border-color: #6ddba0;
+  background: linear-gradient(180deg, rgba(46,204,113,0.18), rgba(0,0,0,0.2));
+  box-shadow: 0 0 14px rgba(46,204,113,0.35);
+}
+
+/* House that has reached the per-house ₹60,000 maximum */
+.house.at-max {
+  border-color: #ff8a7a;
+  background: linear-gradient(180deg, rgba(255,138,122,0.22), rgba(0,0,0,0.2));
+  box-shadow: 0 0 18px rgba(255,138,122,0.5);
+  animation: houseAtMax 1.6s ease-in-out infinite;
+}
+@keyframes houseAtMax {
+  0%, 100% { box-shadow: 0 0 14px rgba(255,138,122,0.4); }
+  50%      { box-shadow: 0 0 22px rgba(255,138,122,0.7); }
+}
+
+/* Per-house max-bet label shown inside each house */
+.house-max-label {
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(255,255,255,0.55);
+  background: rgba(0,0,0,0.35);
+  border-radius: 4px;
+  padding: 1px 5px;
+  z-index: 1;
+}
+.house.at-max .house-max-label {
+  color: #ffd9d2;
+  background: rgba(255,138,122,0.4);
+}
+
 .house.pulse {
   animation: housePulse 0.4s ease-out;
 }
@@ -1750,6 +1785,64 @@ body::before {
   0%, 100% { transform: scale(1); opacity: 0.4; }
   50%      { transform: scale(1.015); opacity: 0.7; }
 }
+
+/* === EMOTION FACE VARIANTS (crossfade overlay) === */
+/* Photorealistic face variants that crossfade over the active pose
+   when an emotion is set. They sit ABOVE the pose image but BELOW
+   the mouth frames so mouth movement is still visible. */
+.dh-emotion-img {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 100%;
+  width: auto;
+  max-width: 115%;
+  object-fit: cover;
+  object-position: center 18%;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+  will-change: opacity;
+  z-index: 2;
+}
+.dh-emotion-img.active {
+  opacity: 1;
+}
+
+/* === MOUTH VISEME FRAMES (lip-sync flip-book) === */
+/* Photorealistic mouth-shape variants of the SAME dealer face. Stacked
+   above the pose image; we cycle their .active class during speech to
+   create the illusion of natural talking. The flip-book runs at ~8 FPS
+   (120ms per frame) which is fast enough for the eye to perceive
+   continuous lip motion. */
+.dh-mouth-img {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 100%;
+  width: auto;
+  max-width: 115%;
+  object-fit: cover;
+  object-position: center 18%;
+  opacity: 0;
+  pointer-events: none;
+  will-change: opacity;
+  z-index: 7;
+  /* No transition — instant snap between visemes for crisp flip-book */
+}
+.dh-mouth-img.active {
+  opacity: 1;
+}
+/* When the fallback CSS mouth is speaking (and real frames aren't loaded),
+   keep the mouth-img layer hidden so we don't get a static frame stuck
+   on top of the photo. */
+.dh-image-wrap:not(.frames-ready) .dh-mouth-img { display: none; }
+
+/* Keep the old CSS mouth overlay below the new viseme layer so it only
+   shows as a fallback when real frames aren't loaded. */
+.dh-mouth { z-index: 5; }
 
 /* === SPEECH BUBBLE === */
 .dh-bubble {

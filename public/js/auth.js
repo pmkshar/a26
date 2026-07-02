@@ -76,11 +76,17 @@ const Auth = {
     const navBalance = document.getElementById('nav-balance');
     const navRole = document.getElementById('nav-role');
     const navLogout = document.getElementById('nav-logout');
+    const navAdmin = document.getElementById('nav-admin');
 
     if (navUser) navUser.textContent = user.username;
     if (navBalance) navBalance.textContent = '₹' + (user.balance || 0).toLocaleString('en-IN');
     if (navRole) navRole.textContent = user.role === 'admin' ? 'Admin' : 'Player';
-    
+
+    // Show Admin link only for admin users
+    if (navAdmin) {
+      navAdmin.style.display = (user.role === 'admin') ? '' : 'none';
+    }
+
     if (navLogout) {
       navLogout.addEventListener('click', (e) => {
         e.preventDefault();

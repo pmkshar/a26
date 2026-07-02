@@ -133,6 +133,7 @@ function initHouses() {
         <span class="hp hp2">1:2</span>
         <span class="hp hp3">1:4</span>
       </div>
+      <div class="house-max-label">Max \u20B960,000</div>
       <div class="house-bets" id="bets-${h}"></div>
     `;
     div.addEventListener('click', () => selectHouse(h));
@@ -145,16 +146,23 @@ function selectHouse(house) {
   document.querySelectorAll('.house').forEach(el => {
     if (el.dataset.house === house) el.classList.toggle('selected');
   });
+  updateHouseSelectionDisplay();
+  updateDealButton();
+}
+
+function updateHouseSelectionDisplay() {
   const selected = document.querySelectorAll('.house.selected');
   const display = document.getElementById('selectedHouseDisplay');
+  const bettedCount = Object.keys(bets).filter(h => bets[h] > 0).length;
   if (selected.length === 1) {
     display.textContent = 'House: ' + selected[0].dataset.house;
   } else if (selected.length > 1) {
     display.textContent = selected.length + ' houses selected';
+  } else if (bettedCount > 0) {
+    display.textContent = bettedCount + ' house' + (bettedCount > 1 ? 's' : '') + ' bet';
   } else {
-    display.textContent = 'Select a house';
+    display.textContent = 'Select one or more houses';
   }
-  updateDealButton();
 }
 
 // === CHIPS ===
@@ -187,18 +195,27 @@ function placeBet(house, amount) {
     if (dhReady) DigitalHuman.sayCustom('Insufficient balance. Please top up to continue.', 'sad', 0.96, 0.98);
     return;
   }
-  bets[house] = (bets[house] || 0) + amount;
-  if (bets[house] > MAX_BET) {
-    const excess = bets[house] - MAX_BET;
+  const newTotal = (bets[house] || 0) + amount;
+  if (newTotal > MAX_BET) {
+    // Per-house limit: only accept up to MAX_BET, refuse the excess
+    const accepted = MAX_BET - (bets[house] || 0);
+    if (accepted <= 0) {
+      flashMessage(`House ${house} is at the ₹${MAX_BET} maximum`);
+      if (dhReady) DigitalHuman.sayCustom(`House ${house} is already at the maximum of ${MAX_BET} rupees.`, 'serious', 0.98, 0.98);
+      return;
+    }
     bets[house] = MAX_BET;
-    balance += excess;
-    totalBet -= excess;
-    flashMessage(`Max ₹${MAX_BET} per house`);
+    balance -= accepted;
+    totalBet += accepted;
+    flashMessage(`House ${house} capped at ₹${MAX_BET}`);
+  } else {
+    bets[house] = newTotal;
+    balance -= amount;
+    totalBet += amount;
   }
-  balance -= amount;
-  totalBet += amount;
   updateBalanceUI();
   renderChipsOnHouse(house);
+  updateHouseSelectionDisplay();
   updateDealButton();
   // Pulse the house
   const houseEl = document.querySelector(`.house[data-house="${house}"]`);
@@ -210,11 +227,17 @@ function placeBet(house, amount) {
 
 function renderChipsOnHouse(house) {
   const el = document.getElementById('bets-' + house);
+  const houseEl = document.querySelector(`.house[data-house="${house}"]`);
   if (!bets[house]) {
     el.innerHTML = '';
+    if (houseEl) houseEl.classList.remove('at-max', 'has-bet');
     return;
   }
   el.innerHTML = `<span class="chip-stack">₹${bets[house].toLocaleString('en-IN')}</span>`;
+  if (houseEl) {
+    houseEl.classList.add('has-bet');
+    houseEl.classList.toggle('at-max', bets[house] >= MAX_BET);
+  }
 }
 
 // === BUTTONS ===
@@ -252,8 +275,8 @@ function clearBets() {
   totalBet = 0;
   bets = {};
   document.querySelectorAll('.house-bets').forEach(el => el.innerHTML = '');
-  document.querySelectorAll('.house').forEach(el => el.classList.remove('selected'));
-  document.getElementById('selectedHouseDisplay').textContent = 'Select a house';
+  document.querySelectorAll('.house').forEach(el => el.classList.remove('selected', 'at-max', 'has-bet'));
+  document.getElementById('selectedHouseDisplay').textContent = 'Select one or more houses';
   document.getElementById('betInput').value = '';
   updateBalanceUI();
   updateDealButton();
@@ -450,11 +473,12 @@ async function dealNow() {
   if (dhReady) {
     if (totalWin > 0) {
       DigitalHuman.setPose('reveal-win');
-      if (bestMatchCount === 3) DigitalHuman.say('win3');
-      else if (bestMatchCount === 2) DigitalHuman.say('win2');
-      else DigitalHuman.say('win1');
+      if (bestMatchCount === 3) { DigitalHuman.setEmotion('surprised'); DigitalHuman.say('win3'); }
+      else if (bestMatchCount === 2) { DigitalHuman.setEmotion('happy'); DigitalHuman.say('win2'); }
+      else { DigitalHuman.setEmotion('happy'); DigitalHuman.say('win1'); }
     } else {
       DigitalHuman.setPose('reveal-lose');
+      DigitalHuman.setEmotion('sad');
       DigitalHuman.say('lose');
     }
   }
@@ -573,9 +597,9 @@ function resetRound() {
   bets = {};
   totalBet = 0;
   document.getElementById('betInput').value = '';
-  document.querySelectorAll('.house').forEach(el => el.classList.remove('selected', 'house-highlight'));
+  document.querySelectorAll('.house').forEach(el => el.classList.remove('selected', 'house-highlight', 'at-max', 'has-bet'));
   document.querySelectorAll('.house-bets').forEach(el => el.innerHTML = '');
-  document.getElementById('selectedHouseDisplay').textContent = 'Select a house';
+  document.getElementById('selectedHouseDisplay').textContent = 'Select one or more houses';
   for (let i = 1; i <= 3; i++) {
     const slot = document.getElementById('slot' + i);
     slot.classList.remove('revealed', 'match');
