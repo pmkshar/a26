@@ -70,13 +70,18 @@
 
     <div class="auth-footer">
       <p>Demo admin: <strong>admin</strong> / <strong>admin123</strong></p>
+      <hr style="border-color:rgba(212,168,67,0.25);margin:14px 0;">
+      <p style="font-size:0.78rem;color:#bbb;margin-bottom:8px;">Want to try the game first?</p>
+      <a href="/index.html" class="btn btn-full guest-btn">Play as Guest (5,000 trial coins)</a>
+      <p style="font-size:0.7rem;color:#888;margin-top:8px;">Guests can play the full game with sample coins. Register a free account to bet with real stakes and unlock your dashboard.</p>
     </div>
   </div>
 </div>
 
 <script src="/js/auth.js"></script>
 <script>
-// Redirect if already logged in
+// Redirect if already logged in. Guests (not logged in) can just click
+// "Play as Guest" to enter the game without registering.
 if (Auth.isLoggedIn()) {
   const user = Auth.getUser();
   window.location.href = user.role === 'admin' ? '/admin.html' : '/dashboard.html';

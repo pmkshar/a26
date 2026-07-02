@@ -2,9 +2,11 @@
 // A26 LIVE CARD GAME
 // 6 Houses (A, 2, 3, 4, 5, 6) · 1:1 / 1:2 / 1:4 payouts
 // AI virtual dealer with multi-pose card-cutting animation
+// Open access: guests play with 5,000 trial coins; registered
+// users play with their server-backed balance.
 // =========================================================
 
-Auth.requireAuth();
+// NOTE: Auth.requireAuth() is now a no-op so the game is open to guests.
 Auth.updateNav();
 
 // === CONSTANTS ===
@@ -37,14 +39,27 @@ let videoClockInterval = null;
 let dhReady = false;
 let idleChatInterval = null;
 let hasSpokenBetPlaced = false;  // Only speak "bet placed" once per round
+let isGuest = false;             // true if running in trial mode
 
 // === INIT ===
 document.addEventListener('DOMContentLoaded', async () => {
-  const user = Auth.getUser();
-  if (user) {
-    balance = user.balance || 0;
+  // Branch on guest vs registered user. Guests use the localStorage trial
+  // balance (5,000 coins); registered users use their server balance.
+  isGuest = Auth.isGuest();
+  if (isGuest) {
+    balance = Auth.getGuestBalance();
+    // If the guest has run out, give them a fresh 5,000 on this visit so
+    // they can keep exploring. (The "Out of coins" modal will fire if they
+    // actually try to place a bet with 0 balance.)
+    if (balance <= 0) {
+      balance = Auth.refillGuestBalance();
+    }
+  } else {
+    const user = Auth.getUser();
+    balance = user ? (user.balance || 0) : 0;
   }
   updateBalanceUI();
+  updateModeUI();
 
   initHouses();
   initChips();
@@ -52,6 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initButtons();
   startVideoClock();
   initScoreboard();
+  bindOutOfCoinsModal();
 
   // Initialize the AI Digital Human dealer
   try {
@@ -79,6 +95,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Begin first betting window
   startBettingWindow();
 });
+
+// Update the trial-mode banner visibility and any other mode-dependent UI
+function updateModeUI() {
+  Auth.updateNav();
+}
+
+// Persist the current balance back to whatever store is appropriate:
+// localStorage for guests, server-synced for registered users (handled in
+// dealNow via /api/player/bet).
+function persistBalance() {
+  if (isGuest) {
+    Auth.setGuestBalance(balance);
+  } else {
+    const user = Auth.getUser();
+    if (user) {
+      user.balance = balance;
+      localStorage.setItem('a26_user', JSON.stringify(user));
+    }
+  }
+}
+
+// Bind the "Out of coins" modal buttons (refill trial / go to login)
+function bindOutOfCoinsModal() {
+  const overlay = document.getElementById('outOfCoinsOverlay');
+  const refillBtn = document.getElementById('btnRefillTrial');
+  if (refillBtn) {
+    refillBtn.addEventListener('click', () => {
+      balance = Auth.refillGuestBalance();
+      persistBalance();
+      updateBalanceUI();
+      if (overlay) overlay.classList.remove('show');
+      flashMessage('5,000 trial coins added!');
+    });
+  }
+}
 
 // === IDLE CHATTER (contextual banter — only when truly idle and silent) ===
 function startIdleChatter() {
@@ -182,12 +233,13 @@ function removeBetFromHouse(house) {
   balance += refund;
   totalBet -= refund;
   delete bets[house];
+  persistBalance();
   renderChipsOnHouse(house);
   updateBalanceUI();
   updateHouseSelectionDisplay();
   updateBetSummary();
   updateDealButton();
-  flashMessage(`Removed ₹${refund.toLocaleString('en-IN')} from house ${house}`);
+  flashMessage(`Removed \u20B9${refund.toLocaleString('en-IN')} from house ${house}`);
 }
 
 function updateHouseSelectionDisplay() {
@@ -226,11 +278,16 @@ function initChips() {
 function placeBet(house, amount) {
   if (!isBettingOpen || isDealing) return;
   if (amount < MIN_BET || amount > MAX_BET) {
-    flashMessage(`Bet must be between ₹${MIN_BET} and ₹${MAX_BET}`);
+    flashMessage(`Bet must be between \u20B9${MIN_BET} and \u20B9${MAX_BET}`);
     if (dhReady) DigitalHuman.sayCustom(`Bet must be between ${MIN_BET} and ${MAX_BET} rupees.`, 'serious', 0.98, 0.98);
     return;
   }
   if (balance < amount) {
+    if (isGuest) {
+      // Guest ran out of trial coins — prompt to register or refill.
+      showOutOfCoinsModal();
+      return;
+    }
     flashMessage('Insufficient balance');
     if (dhReady) DigitalHuman.sayCustom('Insufficient balance. Please top up to continue.', 'sad', 0.96, 0.98);
     return;
@@ -240,19 +297,20 @@ function placeBet(house, amount) {
     // Per-house limit: only accept up to MAX_BET, refuse the excess
     const accepted = MAX_BET - (bets[house] || 0);
     if (accepted <= 0) {
-      flashMessage(`House ${house} is at the ₹${MAX_BET} maximum`);
+      flashMessage(`House ${house} is at the \u20B9${MAX_BET} maximum`);
       if (dhReady) DigitalHuman.sayCustom(`House ${house} is already at the maximum of ${MAX_BET} rupees.`, 'serious', 0.98, 0.98);
       return;
     }
     bets[house] = MAX_BET;
     balance -= accepted;
     totalBet += accepted;
-    flashMessage(`House ${house} capped at ₹${MAX_BET}`);
+    flashMessage(`House ${house} capped at \u20B9${MAX_BET}`);
   } else {
     bets[house] = newTotal;
     balance -= amount;
     totalBet += amount;
   }
+  persistBalance();
   updateBalanceUI();
   renderChipsOnHouse(house);
   updateHouseSelectionDisplay();
@@ -269,9 +327,15 @@ function placeBet(house, amount) {
   }
   // Push the player's own bet to the Live Activity feed
   try {
-    const me = (Auth.getUser() && Auth.getUser().username) || 'You';
+    const me = isGuest ? Auth.getGuestName() : ((Auth.getUser() && Auth.getUser().username) || 'You');
     LiveActivity.pushEvent('bet', { name: me, house, amount });
   } catch (e) { /* feed is optional */ }
+}
+
+// Show the "Out of trial coins" modal (guests only)
+function showOutOfCoinsModal() {
+  const overlay = document.getElementById('outOfCoinsOverlay');
+  if (overlay) overlay.classList.add('show');
 }
 
 // Render the active bets summary panel
@@ -351,6 +415,7 @@ function clearBets() {
   document.querySelectorAll('.house').forEach(el => el.classList.remove('selected', 'at-max', 'has-bet'));
   document.getElementById('selectedHouseDisplay').textContent = 'Select one or more houses';
   document.getElementById('betInput').value = '';
+  persistBalance();
   updateBalanceUI();
   updateBetSummary();
   updateDealButton();
@@ -582,7 +647,7 @@ async function dealNow() {
   // Also push the player's own result to the Live Activity feed so they
   // see themselves alongside the other players.
   try {
-    const me = (Auth.getUser() && Auth.getUser().username) || 'You';
+    const me = isGuest ? Auth.getGuestName() : ((Auth.getUser() && Auth.getUser().username) || 'You');
     if (totalWin > 0) {
       LiveActivity.pushEvent('win', {
         name: me,
@@ -602,12 +667,9 @@ async function dealNow() {
   balance += totalWin;
   lastWin = totalWin;
 
-  // Update localStorage user
-  const user = Auth.getUser();
-  if (user) {
-    user.balance = balance;
-    localStorage.setItem('a26_user', JSON.stringify(user));
-  }
+  // Persist the new balance (guest: localStorage; registered: localStorage
+  // and server-sync below)
+  persistBalance();
 
   // Show result banner
   const banner = document.getElementById('resultBanner');
@@ -644,21 +706,24 @@ async function dealNow() {
 
   if (totalWin > 0) launchConfetti();
 
-  // Persist bet to backend (best-effort)
-  try {
-    await Auth.api('/api/player/bet', {
-      method: 'POST',
-      body: JSON.stringify({
-        roundId: 'round_' + round,
-        house: bettedHouses.join(','),
-        amount: totalBet,
-        winnings: totalWin,
-        result: drawn.map(c => c.value).join(','),
-        finalBalance: balance
-      })
-    });
-  } catch (e) {
-    console.log('Server sync skipped:', e.message);
+  // Persist bet to backend (best-effort). Only registered users have a
+  // server-side balance to sync; guests just keep their localStorage balance.
+  if (!isGuest) {
+    try {
+      await Auth.api('/api/player/bet', {
+        method: 'POST',
+        body: JSON.stringify({
+          roundId: 'round_' + round,
+          house: bettedHouses.join(','),
+          amount: totalBet,
+          winnings: totalWin,
+          result: drawn.map(c => c.value).join(','),
+          finalBalance: balance
+        })
+      });
+    } catch (e) {
+      console.log('Server sync skipped:', e.message);
+    }
   }
 
   round++;

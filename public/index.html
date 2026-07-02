@@ -13,7 +13,7 @@
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=dh10">
+<link rel="stylesheet" href="/css/style.css?v=dh11">
 </head>
 <body>
 
@@ -23,11 +23,24 @@
   <div class="nav-info">
     <span class="nav-user" id="nav-user"></span>
     <span class="nav-balance" id="nav-balance">₹0</span>
+    <span class="nav-mode-badge" id="navModeBadge" style="display:none;">TRIAL</span>
     <div class="nav-links">
-      <a href="/dashboard.html" class="hide-mobile">Dashboard</a>
+      <a href="/dashboard.html" class="hide-mobile" id="nav-dashboard" style="display:none;">Dashboard</a>
       <a href="/admin.html" class="hide-mobile" id="nav-admin" style="display:none;">Admin</a>
-      <a href="#" id="nav-logout">Logout</a>
+      <a href="/login.html" id="nav-login" style="display:none;">Login / Register</a>
+      <a href="#" id="nav-logout" style="display:none;">Logout</a>
     </div>
+  </div>
+</div>
+
+<!-- GUEST / TRIAL MODE BANNER (shown only for guests) -->
+<div class="trial-banner" id="trialBanner" style="display:none;">
+  <div class="trial-banner-inner">
+    <div class="trial-banner-text">
+      <strong>TRIAL MODE</strong> · Playing with 5,000 sample coins.
+      Register a free account to bet with real stakes and unlock your dashboard.
+    </div>
+    <a href="/login.html" class="trial-banner-btn">Register to Bet Real Money →</a>
   </div>
 </div>
 
@@ -86,25 +99,12 @@
     </div>
   </div>
 
-  <!-- RIGHT: TABLE WITH 6 HOUSES -->
+  <!-- CENTER: TABLE WITH 6 HOUSES -->
   <div class="table-pane">
 
     <!-- SCOREBOARD / HISTORY -->
     <div class="scoreboard" id="scoreboard">
       <div class="scoreboard-empty">No rounds yet</div>
-    </div>
-
-    <!-- LIVE ACTIVITY FEED — shows other players' bets and wins in real-time -->
-    <div class="live-activity" id="liveActivity">
-      <div class="live-activity-header">
-        <span class="live-activity-title">
-          <span class="live-dot"></span> Live Activity
-        </span>
-        <span class="live-activity-count" id="liveActivityCount">0 players online</span>
-      </div>
-      <div class="live-activity-feed" id="liveActivityFeed">
-        <div class="live-activity-empty">Waiting for other players to join...</div>
-      </div>
     </div>
 
     <!-- TABLE WITH 6 HOUSES -->
@@ -187,6 +187,21 @@
       <div class="history-list" id="historyList"></div>
     </div>
   </div>
+
+  <!-- RIGHT: LIVE ACTIVITY FEED (other players' bets and wins in real-time) -->
+  <div class="live-activity-pane">
+    <div class="live-activity" id="liveActivity">
+      <div class="live-activity-header">
+        <span class="live-activity-title">
+          <span class="live-dot"></span> Live Activity
+        </span>
+        <span class="live-activity-count" id="liveActivityCount">0 players online</span>
+      </div>
+      <div class="live-activity-feed" id="liveActivityFeed">
+        <div class="live-activity-empty">Waiting for other players to join...</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- RESULT MODAL -->
@@ -197,6 +212,20 @@
     <div class="result-detail" id="resultMatches"></div>
     <div id="resultAmount"></div>
     <button class="btn-close" id="btnNewRound">New Round</button>
+  </div>
+</div>
+
+<!-- OUT-OF-COINS MODAL (guest ran out of trial coins) -->
+<div class="result-overlay" id="outOfCoinsOverlay">
+  <div class="result-modal">
+    <h2 style="color:#f0c674;">Out of Trial Coins</h2>
+    <div class="result-detail" style="text-align:center;color:#ddd;">
+      You've used up your 5,000 sample coins.<br>Register a free account to bet with real stakes and unlock your dashboard.
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <a href="/login.html" class="btn-close" style="text-decoration:none;text-align:center;background:linear-gradient(135deg,#d4a843,#f0d68a);color:#021a0e;">Register / Login</a>
+      <button class="btn-close" id="btnRefillTrial" style="background:#444;color:#fff;">Get 5,000 more</button>
+    </div>
   </div>
 </div>
 
@@ -217,10 +246,10 @@
   <p><strong>Card Values:</strong> A = Ace · 2-10 = face value · J, Q, K count as their rank only when house matches.</p>
 </div>
 
-<script src="/js/auth.js?v=dh10"></script>
-<script src="/js/digital-human.js?v=dh10"></script>
-<script src="/js/live-activity.js?v=dh10"></script>
-<script src="/js/game.js?v=dh10"></script>
+<script src="/js/auth.js?v=dh11"></script>
+<script src="/js/digital-human.js?v=dh11"></script>
+<script src="/js/live-activity.js?v=dh11"></script>
+<script src="/js/game.js?v=dh11"></script>
 <script>
 // PWA service worker registration
 if ('serviceWorker' in navigator) {

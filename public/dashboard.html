@@ -75,9 +75,13 @@
   </div>
 </div>
 
-<script src="/js/auth.js?v=dh10"></script>
+<script src="/js/auth.js?v=dh11"></script>
 <script>
-Auth.requireAuth();
+// Dashboard is a registered-user-only page. Redirect guests to the login
+// page so they can register / log in (the game itself remains open to all).
+if (!Auth.isLoggedIn()) {
+  window.location.href = '/login.html';
+}
 Auth.updateNav();
 
 const user = Auth.getUser();

@@ -191,6 +191,28 @@ body::before {
 .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(212,168,67,0.5); }
 .btn-full { width: 100%; }
 
+/* Guest / Trial button on the login page */
+.guest-btn {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  background: linear-gradient(135deg, #2a3f2a, #1a6b3a);
+  color: #f0d68a !important;
+  border: 1px solid rgba(212,168,67,0.4);
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  transition: all 0.25s;
+}
+.guest-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(46,204,113,0.35);
+  background: linear-gradient(135deg, #1a6b3a, #2ecc71);
+  color: #fff !important;
+}
+
 .auth-footer {
   text-align: center;
   margin-top: 20px;
@@ -260,6 +282,81 @@ body::before {
 
 .nav-links a:hover { color: var(--gold-light); }
 
+/* === NAV MODE BADGE (TRIAL / REAL) === */
+.nav-mode-badge {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #c41e3a, #f0c674);
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+.nav-mode-badge.real {
+  background: linear-gradient(135deg, #1a6b3a, #2ecc71);
+}
+
+/* === TRIAL MODE BANNER === */
+.trial-banner {
+  background: linear-gradient(90deg, rgba(196,30,58,0.85), rgba(212,168,67,0.85));
+  border-bottom: 1px solid rgba(255,255,255,0.2);
+  padding: 7px 14px;
+  position: relative;
+  z-index: 40;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+
+.trial-banner-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  max-width: 1400px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+}
+
+.trial-banner-text {
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.trial-banner-text strong {
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin-right: 4px;
+}
+
+.trial-banner-btn {
+  background: #021a0e;
+  color: var(--gold-light) !important;
+  text-decoration: none;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  border: 1px solid var(--gold);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.trial-banner-btn:hover {
+  background: var(--gold);
+  color: #021a0e !important;
+}
+
+@media (max-width: 600px) {
+  .trial-banner-inner { gap: 8px; }
+  .trial-banner-text { font-size: 0.72rem; text-align: center; }
+  .trial-banner-btn { font-size: 0.7rem; padding: 5px 10px; }
+}
+
 /* === HEADER === */
 .header {
   text-align: center;
@@ -288,19 +385,63 @@ body::before {
 /* === MAIN STAGE LAYOUT === */
 .stage {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) 1fr;
+  grid-template-columns: minmax(280px, 360px) 1fr minmax(240px, 300px);
   gap: 14px;
   padding: 8px 12px 30px;
-  max-width: 1400px;
+  max-width: 1500px;
   margin: 0 auto;
   position: relative;
   z-index: 2;
+}
+
+/* Two-step responsive collapse:
+   - < 1280px: hide right sidebar (live activity drops below table)
+   - < 900px: single column, everything stacks */
+@media (max-width: 1279px) {
+  .stage {
+    grid-template-columns: minmax(280px, 340px) 1fr;
+  }
+  .live-activity-pane {
+    /* On medium screens the live activity pane spans the full width below
+       the dealer + table panes. */
+    grid-column: 1 / -1;
+    order: 3;
+  }
 }
 
 @media (max-width: 900px) {
   .stage {
     grid-template-columns: 1fr;
     padding: 8px 8px 30px;
+  }
+  .live-activity-pane {
+    order: 4;
+  }
+}
+
+/* === RIGHT-SIDE LIVE ACTIVITY PANE === */
+.live-activity-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* On wide screens make the live activity feed sticky so it stays in view
+   while the user scrolls the longer table pane. */
+@media (min-width: 1280px) {
+  .live-activity-pane .live-activity {
+    position: sticky;
+    top: 8px;
+    max-height: calc(100vh - 16px);
+  }
+}
+
+/* When the live-activity feed moves below the table (medium screens),
+   give it a sensible height so it doesn't dominate the page. */
+@media (max-width: 1279px) {
+  .live-activity-pane .live-activity {
+    max-height: 320px;
   }
 }
 
@@ -683,6 +824,17 @@ body::before {
   gap: 6px;
   max-height: 240px;
   min-height: 120px;
+}
+
+/* When the live-activity pane is the right sidebar (wide screens),
+   allow it to grow tall enough to be useful. The sticky positioning
+   is set above; here we lift the max-height. */
+@media (min-width: 1280px) {
+  .live-activity-pane .live-activity {
+    max-height: calc(100vh - 16px);
+    min-height: 480px;
+    flex: 1;
+  }
 }
 
 .live-activity-header {
