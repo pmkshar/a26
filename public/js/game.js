@@ -1,43 +1,34 @@
 // =========================================================
-// A26 SPEED BACCARAT - Live Dealer Edition
+// A26 LIVE CARD GAME
+// 6 Houses (A, 2, 3, 4, 5, 6) · 1:1 / 1:2 / 1:4 payouts
+// AI virtual dealer with multi-pose card-cutting animation
 // =========================================================
 
 Auth.requireAuth();
 Auth.updateNav();
 
 // === CONSTANTS ===
+const HOUSES = ['A', '2', '3', '4', '5', '6'];
+const CARD_VALUES = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
 const SUITS = [
   { sym: '\u2660', color: 'black' }, // spade
   { sym: '\u2665', color: 'red' },   // heart
   { sym: '\u2666', color: 'red' },   // diamond
   { sym: '\u2663', color: 'black' }  // club
 ];
-const RANKS = ['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
-const PAYOUTS = {
-  player: 1,
-  banker: 0.95,
-  tie: 8,
-  playerPair: 11,
-  bankerPair: 11
-};
-const BET_LABELS = {
-  player: 'PLAYER',
-  banker: 'BANKER',
-  tie: 'TIE',
-  playerPair: 'P PAIR',
-  bankerPair: 'B PAIR'
-};
-const BET_WINDOW_MS = 12000; // 12 second speed baccarat betting window
+const BET_WINDOW_MS = 20000; // 20 second betting window
+const MIN_BET = 2000;
+const MAX_BET = 60000;
 
 // === STATE ===
 let balance = 0;
-let bets = {};          // { player: 5000, banker: 0, ... }
+let bets = {};          // { A: 5000, 2: 0, 3: 3000, ... }
 let totalBet = 0;
 let round = 1;
 let history = [];
 let isDealing = false;
 let isBettingOpen = true;
-let selectedChip = 2000;
+let selectedChip = 5000;
 let currentDealer = 1;
 let betTimerInterval = null;
 let betWindowStart = 0;
@@ -52,9 +43,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   updateBalanceUI();
 
+  initHouses();
   initChips();
   initBetTiles();
   initDealerSwitch();
+  initButtons();
   startVideoClock();
   initScoreboard();
 
@@ -75,7 +68,7 @@ function startVideoClock() {
   }, 1000);
 }
 
-// === SCOREBOARD (P/B/T bead plate) ===
+// === SCOREBOARD ===
 function initScoreboard() {
   const sb = document.getElementById('scoreboard');
   sb.innerHTML = '<div class="scoreboard-empty">No rounds yet</div>';
@@ -87,42 +80,125 @@ function updateScoreboard() {
     sb.innerHTML = '<div class="scoreboard-empty">No rounds yet</div>';
     return;
   }
-  const last = history.slice(0, 20);
+  const last = history.slice(0, 24);
   sb.innerHTML = last.map(h => {
-    let cls = 'bead-tie';
-    let lbl = 'T';
-    if (h.winner === 'player') { cls = 'bead-player'; lbl = 'P'; }
-    else if (h.winner === 'banker') { cls = 'bead-banker'; lbl = 'B'; }
-    return `<div class="bead ${cls}">${lbl}</div>`;
+    const net = h.won - h.bet;
+    const cls = net > 0 ? 'bead-win' : 'bead-lose';
+    const lbl = net > 0 ? 'W' : 'L';
+    const title = `Round ${h.round}: ${h.cards.join(' ')} - ${net >= 0 ? '+' : ''}₹${net}`;
+    return `<div class="bead ${cls}" title="${title}">${lbl}</div>`;
   }).join('');
 }
 
-// === CHIP SELECTOR ===
+// === INIT HOUSES (the 6 betting boxes on the table) ===
+function initHouses() {
+  const grid = document.getElementById('housesGrid');
+  grid.innerHTML = '';
+  HOUSES.forEach(h => {
+    const div = document.createElement('div');
+    div.className = 'house';
+    div.dataset.house = h;
+    div.innerHTML = `
+      <div class="house-label">${h}</div>
+      <div class="house-dots">${'<div class="house-dot"></div>'.repeat(4)}</div>
+      <div class="house-payouts">
+        <span class="hp hp1">1:1</span>
+        <span class="hp hp2">1:2</span>
+        <span class="hp hp3">1:4</span>
+      </div>
+      <div class="house-bets" id="bets-${h}"></div>
+    `;
+    div.addEventListener('click', () => selectHouse(h));
+    grid.appendChild(div);
+  });
+}
+
+function selectHouse(house) {
+  if (isDealing || !isBettingOpen) return;
+  document.querySelectorAll('.house').forEach(el => {
+    if (el.dataset.house === house) el.classList.toggle('selected');
+  });
+  const selected = document.querySelectorAll('.house.selected');
+  const display = document.getElementById('selectedHouseDisplay');
+  if (selected.length === 1) {
+    display.textContent = 'House: ' + selected[0].dataset.house;
+  } else if (selected.length > 1) {
+    display.textContent = selected.length + ' houses selected';
+  } else {
+    display.textContent = 'Select a house';
+  }
+  updateDealButton();
+}
+
+// === CHIPS ===
 function initChips() {
   document.querySelectorAll('.chip').forEach(c => {
     c.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(x => x.classList.remove('selected'));
-      c.classList.add('selected');
-      selectedChip = parseInt(c.dataset.value);
+      const val = parseInt(c.dataset.value);
+      // If a house is selected, immediately place this chip on it
+      const selected = document.querySelectorAll('.house.selected');
+      if (selected.length > 0) {
+        selected.forEach(el => placeBet(el.dataset.house, val));
+      } else {
+        // Otherwise just set the bet input
+        document.getElementById('betInput').value = val;
+      }
     });
   });
-  // Default selection
-  document.querySelector('.chip-5000').classList.add('selected');
-  selectedChip = 5000;
 }
 
-// === BET TILES ===
-function initBetTiles() {
-  document.querySelectorAll('.bet-tile').forEach(tile => {
-    tile.addEventListener('click', () => {
-      if (!isBettingOpen || isDealing) return;
-      const bet = tile.dataset.bet;
-      placeBet(bet, selectedChip);
-    });
-  });
+// === PLACE BET ===
+function placeBet(house, amount) {
+  if (!isBettingOpen || isDealing) return;
+  if (amount < MIN_BET || amount > MAX_BET) {
+    flashMessage(`Bet must be between ₹${MIN_BET} and ₹${MAX_BET}`);
+    return;
+  }
+  if (balance < amount) {
+    flashMessage('Insufficient balance');
+    return;
+  }
+  bets[house] = (bets[house] || 0) + amount;
+  if (bets[house] > MAX_BET) {
+    const excess = bets[house] - MAX_BET;
+    bets[house] = MAX_BET;
+    balance += excess;
+    totalBet -= excess;
+    flashMessage(`Max ₹${MAX_BET} per house`);
+  }
+  balance -= amount;
+  totalBet += amount;
+  updateBalanceUI();
+  renderChipsOnHouse(house);
+  updateDealButton();
+  // Pulse the house
+  const houseEl = document.querySelector(`.house[data-house="${house}"]`);
+  houseEl.classList.add('pulse');
+  setTimeout(() => houseEl.classList.remove('pulse'), 400);
+}
 
+function renderChipsOnHouse(house) {
+  const el = document.getElementById('bets-' + house);
+  if (!bets[house]) {
+    el.innerHTML = '';
+    return;
+  }
+  el.innerHTML = `<span class="chip-stack">₹${bets[house].toLocaleString('en-IN')}</span>`;
+}
+
+// === BUTTONS ===
+function initButtons() {
   document.getElementById('btnClear').addEventListener('click', clearBets);
   document.getElementById('btnDeal').addEventListener('click', dealNow);
+  document.getElementById('btnNewRound').addEventListener('click', closeResult);
+  document.getElementById('btnRules').addEventListener('click', () => {
+    document.getElementById('rulesPanel').classList.toggle('show');
+  });
+  document.getElementById('betInput').addEventListener('input', updateDealButton);
+}
+
+function initBetTiles() {
+  // No separate bet tiles in A26 - houses are the bet tiles
 }
 
 // === DEALER SWITCH ===
@@ -140,55 +216,45 @@ function initDealerSwitch() {
 
 function setDealerPose(pose) {
   const img = document.getElementById('dealerFrame');
-  img.src = `/images/dealers/dealer${currentDealer}_${pose}.png`;
-  img.dataset.current = pose;
+  // dealer2 doesn't have a reveal pose generated; fallback to dealing
+  const actualPose = (currentDealer === 2 && pose === 'reveal') ? 'dealing' : pose;
+  img.src = `/images/dealers/dealer${currentDealer}_${actualPose}.png`;
+  img.dataset.current = actualPose;
 }
 
 function setDealerBubble(text) {
-  document.getElementById('dealerBubble').textContent = text;
+  const bubble = document.getElementById('dealerBubble');
+  bubble.textContent = text;
+  // Restart animation
+  bubble.style.animation = 'none';
+  bubble.offsetHeight; // trigger reflow
+  bubble.style.animation = '';
 }
 
-// === PLACE / CLEAR BETS ===
-function placeBet(bet, amount) {
-  if (balance < amount) {
-    flashMessage('Insufficient balance');
-    return;
-  }
-  bets[bet] = (bets[bet] || 0) + amount;
-  balance -= amount;
-  totalBet += amount;
-  updateBalanceUI();
-  renderChipsOnTile(bet);
-  updateDealButton();
-  // Subtle pulse on bet tile
-  const tile = document.querySelector(`.bet-tile[data-bet="${bet}"]`);
-  tile.classList.add('pulse');
-  setTimeout(() => tile.classList.remove('pulse'), 400);
-}
-
-function renderChipsOnTile(bet) {
-  const el = document.getElementById('chips-' + bet);
-  if (!bets[bet]) {
-    el.innerHTML = '';
-    return;
-  }
-  el.innerHTML = `<span class="chip-stack">₹${bets[bet].toLocaleString('en-IN')}</span>`;
-}
-
+// === CLEAR BETS ===
 function clearBets() {
   if (isDealing || !isBettingOpen) return;
-  // Refund all bets
   balance += totalBet;
   totalBet = 0;
   bets = {};
-  document.querySelectorAll('.bet-tile-chips').forEach(el => el.innerHTML = '');
+  document.querySelectorAll('.house-bets').forEach(el => el.innerHTML = '');
+  document.querySelectorAll('.house').forEach(el => el.classList.remove('selected'));
+  document.getElementById('selectedHouseDisplay').textContent = 'Select a house';
+  document.getElementById('betInput').value = '';
   updateBalanceUI();
   updateDealButton();
 }
 
 function updateDealButton() {
   const btn = document.getElementById('btnDeal');
-  btn.disabled = isDealing || totalBet === 0 || !isBettingOpen;
+  const inputAmount = parseInt(document.getElementById('betInput').value) || 0;
+  const hasSelectedHouse = document.querySelectorAll('.house.selected').length > 0;
+  const hasChipsOnHouses = totalBet > 0;
+  // Can deal if: there are bets on houses OR a house is selected with valid amount in input
+  const canDeal = !isDealing && isBettingOpen && (
+    hasChipsOnHouses || (hasSelectedHouse && inputAmount >= MIN_BET && inputAmount <= MAX_BET)
+  );
+  btn.disabled = !canDeal;
 }
 
 function updateBalanceUI() {
@@ -206,7 +272,7 @@ function startBettingWindow() {
   setDealerPose('idle');
   setDealerBubble('Place your bets');
   updateDealButton();
-  document.getElementById('betTimer').textContent = '12';
+  document.getElementById('betTimer').textContent = '20';
 
   betTimerInterval = setInterval(() => {
     const elapsed = Date.now() - betWindowStart;
@@ -235,12 +301,12 @@ function stopBettingWindow() {
 // === DECK & CARD LOGIC ===
 function createDeck() {
   const deck = [];
-  RANKS.forEach(r => {
-    SUITS.forEach(s => {
-      deck.push({ rank: r, suit: s.sym, color: s.color });
+  CARD_VALUES.forEach(val => {
+    SUITS.forEach(suit => {
+      deck.push({ value: val, suit: suit.sym, color: suit.color });
     });
   });
-  // Shuffle (Fisher-Yates)
+  // Fisher-Yates shuffle
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -248,287 +314,118 @@ function createDeck() {
   return deck;
 }
 
-function cardValue(card) {
-  if (card.rank === 'A') return 1;
-  if (['10','J','Q','K'].includes(card.rank)) return 0;
-  return parseInt(card.rank);
-}
-
-function handTotal(cards) {
-  const sum = cards.reduce((a, c) => a + cardValue(c), 0);
-  return sum % 10;
-}
-
-// === BACCARAT THIRD-CARD RULES ===
-function determineDraw(playerCards, bankerCards) {
-  const pTotal = handTotal(playerCards);
-  const bTotal = handTotal(bankerCards);
-
-  // Natural - no more cards
-  if (pTotal >= 8 || bTotal >= 8) {
-    return { playerDraws: false, bankerDraws: false, playerThird: null, natural: true };
-  }
-
-  let playerDraws = false;
-  let playerThird = null;
-
-  // Player rule: stands on 6-7, draws on 0-5
-  if (pTotal <= 5) {
-    playerDraws = true;
-  }
-
-  let bankerDraws = false;
-  if (playerDraws) {
-    // Player drew a third card
-    // Banker rules based on player's third card value
-    if (bTotal <= 5) {
-      bankerDraws = true;
-    }
-    // More granular rules:
-    if (bTotal === 6) {
-      // Banker draws only if player's third is 6 or 7
-      // (handled by drawing first below)
-    }
-  } else {
-    // Player stood (6 or 7)
-    if (bTotal <= 5) bankerDraws = true;
-  }
-
-  return { playerDraws, bankerDraws, playerThird, natural: false };
-}
-
-// Standard baccarat third-card rules (full implementation)
-function applyThirdCardRules(playerCards, bankerCards, deck) {
-  const pTotal = handTotal(playerCards);
-  const bTotal = handTotal(bankerCards);
-
-  const result = {
-    playerThird: null,
-    bankerThird: null,
-    natural: false
-  };
-
-  // Natural - both stand
-  if (pTotal >= 8 || bTotal >= 8) {
-    result.natural = true;
-    return result;
-  }
-
-  // Player rule
-  let playerDrew = false;
-  if (pTotal <= 5) {
-    result.playerThird = deck.pop();
-    playerCards.push(result.playerThird);
-    playerDrew = true;
-  }
-
-  // Banker rule
-  const p3 = result.playerThird ? cardValue(result.playerThird) : null;
-  let bankerDraws = false;
-
-  if (!playerDrew) {
-    // Player stood on 6 or 7
-    if (bTotal <= 5) bankerDraws = true;
-  } else {
-    // Player drew - complex banker rules
-    if (bTotal <= 2) bankerDraws = true;
-    else if (bTotal === 3) bankerDraws = (p3 !== 8);
-    else if (bTotal === 4) bankerDraws = (p3 >= 2 && p3 <= 7);
-    else if (bTotal === 5) bankerDraws = (p3 >= 4 && p3 <= 7);
-    else if (bTotal === 6) bankerDraws = (p3 === 6 || p3 === 7);
-    // bTotal 7: stands
-  }
-
-  if (bankerDraws) {
-    result.bankerThird = deck.pop();
-    bankerCards.push(result.bankerThird);
-  }
-
-  return result;
-}
-
-// === PAYOUT CALCULATION ===
-function calculatePayout(playerCards, bankerCards, bets) {
-  const pTotal = handTotal(playerCards);
-  const bTotal = handTotal(bankerCards);
-  let winner;
-  if (pTotal > bTotal) winner = 'player';
-  else if (bTotal > pTotal) winner = 'banker';
-  else winner = 'tie';
-
-  // Pairs: first 2 cards same rank
-  const playerPair = playerCards[0].rank === playerCards[1].rank;
-  const bankerPair = bankerCards[0].rank === bankerCards[1].rank;
-
-  let totalWin = 0;
-  const breakdown = {};
-
-  Object.entries(bets).forEach(([bet, amount]) => {
-    let win = 0;
-    if (bet === 'player' && winner === 'player') {
-      win = amount + amount * PAYOUTS.player;
-    } else if (bet === 'banker' && winner === 'banker') {
-      win = amount + amount * PAYOUTS.banker;
-    } else if (bet === 'tie' && winner === 'tie') {
-      // Tie bet pays 8:1; player/banker bets push (returned)
-      win = amount + amount * PAYOUTS.tie;
-    } else if (bet === 'playerPair' && playerPair) {
-      win = amount + amount * PAYOUTS.playerPair;
-    } else if (bet === 'bankerPair' && bankerPair) {
-      win = amount + amount * PAYOUTS.bankerPair;
-    } else if ((bet === 'player' || bet === 'banker') && winner === 'tie') {
-      // Push - return stake
-      win = amount;
-    } else {
-      win = 0;
-    }
-    breakdown[bet] = win;
-    totalWin += win;
-  });
-
-  return { winner, playerPair, bankerPair, totalWin, breakdown, pTotal, bTotal };
-}
-
-// === DEAL NOW ===
+// === DEAL NOW (main game flow) ===
 async function dealNow() {
-  if (isDealing || totalBet === 0) return;
+  if (isDealing) return;
+
+  // If a house is selected AND amount in input, place that bet first
+  const inputAmount = parseInt(document.getElementById('betInput').value) || 0;
+  const selected = document.querySelectorAll('.house.selected');
+  if (selected.length > 0 && inputAmount >= MIN_BET && inputAmount <= MAX_BET) {
+    const totalNeeded = inputAmount * selected.length;
+    if (totalNeeded > balance + totalBet) {
+      flashMessage('Insufficient balance for all selected houses');
+      return;
+    }
+    selected.forEach(el => placeBet(el.dataset.house, inputAmount));
+  }
+
+  if (totalBet === 0) {
+    flashMessage('Please place at least one bet');
+    return;
+  }
+
   isDealing = true;
   stopBettingWindow();
   document.getElementById('btnDeal').disabled = true;
   document.getElementById('btnClear').disabled = true;
 
-  // Clear previous hand visuals
-  document.getElementById('playerCards').innerHTML = '';
-  document.getElementById('bankerCards').innerHTML = '';
-  document.getElementById('playerScore').textContent = '0';
-  document.getElementById('bankerScore').textContent = '0';
+  // Reset drawn cards display
+  for (let i = 1; i <= 3; i++) {
+    const slot = document.getElementById('slot' + i);
+    slot.classList.remove('revealed', 'match');
+    slot.innerHTML = '<div class="drawn-card-back">A26</div>';
+  }
+  document.getElementById('matchesDisplay').innerHTML = '';
   document.getElementById('resultBanner').textContent = '';
   document.getElementById('resultBanner').className = 'result-banner';
-  document.getElementById('handPlayer').classList.remove('hand-winner');
-  document.getElementById('handBanker').classList.remove('hand-winner');
 
   // === ANIMATION SEQUENCE ===
-  // 1. Dealer cuts the deck (animation)
-  setDealerBubble('Cutting the deck');
+  // 1. Dealer cuts the deck (a player cuts the cards)
+  setDealerBubble('Shuffling the deck');
   setDealerPose('cutting');
   animateDeckShuffle();
   await delay(900);
 
-  // 2. Build deck and "burn" top card (visual flourish)
-  const deck = createDeck();
-  deck.pop(); // burn
-
-  // 3. Deal cards alternately: P, B, P, B (+ optional third cards)
-  const playerCards = [];
-  const bankerCards = [];
-  await dealSequence(deck, playerCards, bankerCards);
-}
-
-async function dealSequence(deck, playerCards, bankerCards) {
-  setDealerPose('dealing');
-  setDealerBubble('Dealing cards');
-
-  // Player 1
-  let c = deck.pop();
-  playerCards.push(c);
-  await renderCard(c, 'playerCards');
-  await delay(350);
-
-  // Banker 1
-  c = deck.pop();
-  bankerCards.push(c);
-  await renderCard(c, 'bankerCards');
-  await delay(350);
-
-  // Player 2
-  c = deck.pop();
-  playerCards.push(c);
-  await renderCard(c, 'playerCards');
-  await delay(350);
-
-  // Banker 2
-  c = deck.pop();
-  bankerCards.push(c);
-  await renderCard(c, 'bankerCards');
-  await delay(400);
-
-  updateScore('player', playerCards);
-  updateScore('banker', bankerCards);
-
-  // Check for naturals
-  const pTotal = handTotal(playerCards);
-  const bTotal = handTotal(bankerCards);
-  if (pTotal >= 8 || bTotal >= 8) {
-    setDealerBubble('Natural!');
-    setDealerPose('reveal');
-    await delay(800);
-    return finishRound(deck, playerCards, bankerCards);
-  }
-
-  // Third card phase
-  setDealerBubble('Drawing third card');
-  setDealerPose('dealing');
-
-  const thirdResult = applyThirdCardRules(playerCards, bankerCards, deck);
-
-  if (thirdResult.playerThird) {
-    await renderCard(thirdResult.playerThird, 'playerCards');
-    updateScore('player', playerCards);
-    await delay(450);
-  }
-  if (thirdResult.bankerThird) {
-    await renderCard(thirdResult.bankerThird, 'bankerCards');
-    updateScore('banker', bankerCards);
-    await delay(450);
-  }
-
-  setDealerBubble('Revealing result');
-  setDealerPose('reveal');
+  // 2. A player cuts the cards
+  setDealerBubble('A player cuts the cards');
   await delay(700);
 
-  return finishRound(deck, playerCards, bankerCards);
-}
+  // 3. Build deck and draw 3 cards
+  setDealerBubble('Drawing 3 cards');
+  setDealerPose('dealing');
 
-function updateScore(side, cards) {
-  const total = handTotal(cards);
-  document.getElementById(side + 'Score').textContent = total;
-}
+  const deck = createDeck();
+  const drawn = [deck[0], deck[1], deck[2]];
 
-async function renderCard(card, containerId) {
-  const container = document.getElementById(containerId);
-  const cardEl = document.createElement('div');
-  cardEl.className = 'play-card';
-  cardEl.innerHTML = `
-    <div class="play-card-inner">
-      <div class="play-card-back">
-        <div class="play-card-back-pattern">A26</div>
-      </div>
-      <div class="play-card-face ${card.color}">
-        <div class="card-corner top">
-          <div class="card-rank">${card.rank}</div>
-          <div class="card-suit-sm">${card.suit}</div>
+  // 4. Reveal each card one by one
+  for (let i = 0; i < 3; i++) {
+    await delay(500);
+    const slot = document.getElementById('slot' + (i + 1));
+    slot.classList.add('revealed');
+    const card = drawn[i];
+    slot.innerHTML = `
+      <div class="drawn-card-face ${card.color}">
+        <div class="dc-corner top">
+          <div class="dc-rank">${card.value}</div>
+          <div class="dc-suit-sm">${card.suit}</div>
         </div>
-        <div class="card-center">${card.suit}</div>
-        <div class="card-corner bottom">
-          <div class="card-rank">${card.rank}</div>
-          <div class="card-suit-sm">${card.suit}</div>
+        <div class="dc-center">${card.suit}</div>
+        <div class="dc-corner bottom">
+          <div class="dc-rank">${card.value}</div>
+          <div class="dc-suit-sm">${card.suit}</div>
         </div>
       </div>
-    </div>
-  `;
-  container.appendChild(cardEl);
-  // Slide-in + flip animation
-  cardEl.classList.add('slide-in');
-  await delay(50);
-  cardEl.classList.add('flip');
-  await delay(450);
-}
+    `;
+    // Pulse the matching houses
+    highlightMatchingHouses(card.value);
+    await delay(400);
+    clearHouseHighlights();
+  }
 
-async function finishRound(deck, playerCards, bankerCards) {
-  const result = calculatePayout(playerCards, bankerCards, bets);
+  // 5. Calculate results
+  setDealerBubble('Calculating wins');
+  setDealerPose('reveal');
+  await delay(500);
 
-  balance += result.totalWin;
-  lastWin = result.totalWin;
+  const bettedHouses = Object.keys(bets);
+  let totalWin = 0;
+  const resultDetails = [];
+
+  bettedHouses.forEach(h => {
+    const matchCount = drawn.filter(c => c.value === h).length;
+    if (matchCount > 0) {
+      let multiplier = 0;
+      let ratio = '';
+      if (matchCount === 1) { multiplier = 1; ratio = '1:1'; }
+      else if (matchCount === 2) { multiplier = 2; ratio = '1:2'; }
+      else if (matchCount === 3) { multiplier = 4; ratio = '1:4'; }
+      const win = bets[h] * (1 + multiplier); // return stake + winnings
+      totalWin += win;
+      resultDetails.push(`House ${h}: ${matchCount} match${matchCount > 1 ? 'es' : ''} (${ratio}) = +₹${(bets[h] * multiplier).toLocaleString('en-IN')}`);
+    } else {
+      resultDetails.push(`House ${h}: No match`);
+    }
+    // Highlight matching drawn cards
+    drawn.forEach((c, idx) => {
+      if (c.value === h) {
+        document.getElementById('slot' + (idx + 1)).classList.add('match');
+      }
+    });
+  });
+
+  balance += totalWin;
+  lastWin = totalWin;
 
   // Update localStorage user
   const user = Auth.getUser();
@@ -539,47 +436,38 @@ async function finishRound(deck, playerCards, bankerCards) {
 
   // Show result banner
   const banner = document.getElementById('resultBanner');
-  let bannerText = '';
-  let bannerCls = 'result-banner show';
-  if (result.winner === 'player') {
-    bannerText = 'PLAYER WINS';
-    bannerCls += ' win-player';
-  } else if (result.winner === 'banker') {
-    bannerText = 'BANKER WINS';
-    bannerCls += ' win-banker';
+  if (totalWin > 0) {
+    banner.textContent = `YOU WON ₹${totalWin.toLocaleString('en-IN')}!`;
+    banner.className = 'result-banner show win';
   } else {
-    bannerText = 'TIE';
-    bannerCls += ' win-tie';
-  }
-  if (result.playerPair) bannerText += ' · P PAIR';
-  if (result.bankerPair) bannerText += ' · B PAIR';
-  banner.textContent = bannerText;
-  banner.className = bannerCls;
-
-  // Highlight winning hand
-  if (result.winner === 'player') {
-    document.getElementById('handPlayer').classList.add('hand-winner');
-  } else if (result.winner === 'banker') {
-    document.getElementById('handBanker').classList.add('hand-winner');
+    banner.textContent = `NO LUCK THIS ROUND`;
+    banner.className = 'result-banner show lose';
   }
 
-  setDealerBubble(result.totalWin > 0 ? `You won ₹${result.totalWin.toLocaleString('en-IN')}!` : 'Better luck next round');
+  // Update matches display
+  const md = document.getElementById('matchesDisplay');
+  if (totalWin > 0) {
+    md.innerHTML = resultDetails.filter(d => d.includes('match')).join('<br>');
+    md.className = 'matches-display show win';
+  } else {
+    md.innerHTML = 'No matches this round';
+    md.className = 'matches-display show lose';
+  }
+
+  setDealerBubble(totalWin > 0 ? `You won ₹${totalWin.toLocaleString('en-IN')}!` : 'Better luck next round');
 
   // Save history
   history.unshift({
     round,
-    winner: result.winner,
-    playerTotal: result.pTotal,
-    bankerTotal: result.bTotal,
-    playerPair: result.playerPair,
-    bankerPair: result.bankerPair,
-    bet: totalBet,
-    won: result.totalWin
+    cards: drawn.map(c => c.value),
+    bets: { ...bets },
+    won: totalWin,
+    bet: totalBet
   });
   updateHistory();
   updateScoreboard();
 
-  if (result.totalWin > 0) launchConfetti();
+  if (totalWin > 0) launchConfetti();
 
   // Persist bet to backend (best-effort)
   try {
@@ -587,39 +475,82 @@ async function finishRound(deck, playerCards, bankerCards) {
       method: 'POST',
       body: JSON.stringify({
         roundId: 'round_' + round,
-        house: result.winner,
+        house: bettedHouses.join(','),
         amount: totalBet,
-        winnings: result.totalWin,
-        result: result.winner,
+        winnings: totalWin,
+        result: drawn.map(c => c.value).join(','),
         finalBalance: balance
       })
     });
   } catch (e) {
-    // ignore network errors - game still works client-side
     console.log('Server sync skipped:', e.message);
   }
 
   round++;
   updateBalanceUI();
 
-  await delay(3000);
-  // Reset for next round
+  // Show result modal after a delay
+  await delay(1500);
+  showResultModal(drawn, bettedHouses, totalWin, totalBet, resultDetails);
+}
+
+function highlightMatchingHouses(value) {
+  document.querySelectorAll('.house').forEach(el => {
+    if (el.dataset.house === value) {
+      el.classList.add('house-highlight');
+    }
+  });
+}
+
+function clearHouseHighlights() {
+  document.querySelectorAll('.house').forEach(el => {
+    el.classList.remove('house-highlight');
+  });
+}
+
+function showResultModal(drawn, bettedHouses, totalWin, totalBet, resultDetails) {
+  const overlay = document.getElementById('resultOverlay');
+  const title = document.getElementById('resultTitle');
+  const cardsEl = document.getElementById('resultCards');
+  const matchesEl = document.getElementById('resultMatches');
+  const amountEl = document.getElementById('resultAmount');
+
+  cardsEl.textContent = 'Cards drawn: ' + drawn.map(c => c.value + c.suit).join('  ');
+  matchesEl.innerHTML = resultDetails.join('<br>');
+
+  if (totalWin > 0) {
+    title.textContent = 'You Win!';
+    amountEl.innerHTML = `<div class="win-amount">+₹${totalWin.toLocaleString('en-IN')}</div><div style="font-size:0.8rem;color:#aaa;margin-top:4px;">Net: ₹${(totalWin - totalBet).toLocaleString('en-IN')}</div>`;
+  } else {
+    title.textContent = 'No Luck';
+    amountEl.innerHTML = `<div class="lose-text">-₹${totalBet.toLocaleString('en-IN')}</div>`;
+  }
+
+  overlay.classList.add('show');
+}
+
+function closeResult() {
+  document.getElementById('resultOverlay').classList.remove('show');
   resetRound();
 }
 
 function resetRound() {
   bets = {};
   totalBet = 0;
-  document.querySelectorAll('.bet-tile-chips').forEach(el => el.innerHTML = '');
-  document.getElementById('handPlayer').classList.remove('hand-winner');
-  document.getElementById('handBanker').classList.remove('hand-winner');
-  document.getElementById('playerCards').innerHTML = '';
-  document.getElementById('bankerCards').innerHTML = '';
-  document.getElementById('playerScore').textContent = '0';
-  document.getElementById('bankerScore').textContent = '0';
-  document.getElementById('btnClear').disabled = false;
+  document.getElementById('betInput').value = '';
+  document.querySelectorAll('.house').forEach(el => el.classList.remove('selected', 'house-highlight'));
+  document.querySelectorAll('.house-bets').forEach(el => el.innerHTML = '');
+  document.getElementById('selectedHouseDisplay').textContent = 'Select a house';
+  for (let i = 1; i <= 3; i++) {
+    const slot = document.getElementById('slot' + i);
+    slot.classList.remove('revealed', 'match');
+    slot.innerHTML = '<div class="drawn-card-back">A26</div>';
+  }
+  document.getElementById('matchesDisplay').innerHTML = '';
+  document.getElementById('matchesDisplay').className = 'matches-display';
   document.getElementById('resultBanner').textContent = '';
   document.getElementById('resultBanner').className = 'result-banner';
+  document.getElementById('btnClear').disabled = false;
   isDealing = false;
   updateBalanceUI();
   startBettingWindow();
@@ -633,14 +564,10 @@ function updateHistory() {
     const div = document.createElement('div');
     div.className = 'history-item';
     const net = h.won - h.bet;
-    let winnerCls = 'tie';
-    let winnerLbl = 'T';
-    if (h.winner === 'player') { winnerCls = 'player'; winnerLbl = 'P'; }
-    else if (h.winner === 'banker') { winnerCls = 'banker'; winnerLbl = 'B'; }
     div.innerHTML = `
-      <div class="hist-bead ${winnerCls}">${winnerLbl}</div>
-      <div class="hist-totals">P${h.playerTotal} · B${h.bankerTotal}</div>
-      <div class="hist-net ${net >= 0 ? 'win' : 'lose'}">${net >= 0 ? '+' : ''}₹${net.toLocaleString('en-IN')}</div>
+      <div>R#${h.round}</div>
+      <div class="round-cards">${h.cards.join(' ')}</div>
+      <div class="round-result ${net >= 0 ? 'win' : 'lose'}">${net >= 0 ? '+' : ''}₹${net.toLocaleString('en-IN')}</div>
     `;
     list.appendChild(div);
   });
@@ -650,7 +577,6 @@ function updateHistory() {
 function animateDeckShuffle() {
   const deck = document.getElementById('deckStack');
   deck.classList.add('shuffling');
-  // Show "cut card" overlay
   const cut = document.getElementById('cutOverlay');
   cut.classList.add('active');
   setTimeout(() => {
@@ -669,12 +595,7 @@ function flashMessage(text) {
       banner.textContent = '';
       banner.className = 'result-banner';
     }
-  }, 1500);
-}
-
-// === RULES TOGGLE ===
-function toggleRules() {
-  document.getElementById('rulesPanel').classList.toggle('show');
+  }, 1800);
 }
 
 // === CONFETTI ===

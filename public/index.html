@@ -2,8 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>A26 - Speed Baccarat Live</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#021a0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="A26 Game">
+<meta name="description" content="A26 - Live Card Game with 6 houses and AI virtual dealer">
+<title>A26 - Live Card Game</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" href="/icons/icon-192.png">
+<link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/style.css">
 </head>
@@ -16,7 +24,7 @@
     <span class="nav-user" id="nav-user"></span>
     <span class="nav-balance" id="nav-balance">₹0</span>
     <div class="nav-links">
-      <a href="/dashboard.html">Dashboard</a>
+      <a href="/dashboard.html" class="hide-mobile">Dashboard</a>
       <a href="#" id="nav-logout">Logout</a>
     </div>
   </div>
@@ -24,11 +32,11 @@
 
 <!-- HEADER -->
 <div class="header">
-  <h1>A26 SPEED BACCARAT</h1>
-  <div class="subtitle">Live Dealer · Round <span id="roundNum">1</span></div>
+  <h1>A26</h1>
+  <div class="subtitle">Live Card Game · Round <span id="roundNum">1</span></div>
 </div>
 
-<!-- MAIN STAGE: LIVE DEALER + TABLE -->
+<!-- MAIN STAGE -->
 <div class="stage">
 
   <!-- LEFT: LIVE DEALER VIDEO -->
@@ -42,7 +50,7 @@
 
       <!-- Dealer image stack (poses swap to create motion) -->
       <div class="dealer-stage" id="dealerStage">
-        <img src="/images/dealers/dealer1_idle.png" alt="Dealer" class="dealer-frame" id="dealerFrame" data-current="idle">
+        <img src="/images/dealers/dealer1_idle.png" alt="Dealer Priya" class="dealer-frame" id="dealerFrame" data-current="idle">
         <!-- Speech / status bubble -->
         <div class="dealer-bubble" id="dealerBubble">Place your bets</div>
       </div>
@@ -69,77 +77,73 @@
         <span class="bet-timer" id="betTimer">--</span>
       </div>
     </div>
+
+    <!-- DEALT CARDS DISPLAY (below dealer video) -->
+    <div class="drawn-cards-panel">
+      <div class="drawn-cards-title">3 Cards Drawn</div>
+      <div class="drawn-cards-row" id="drawnCardsRow">
+        <div class="drawn-card-slot" id="slot1"><div class="drawn-card-back">A26</div></div>
+        <div class="drawn-card-slot" id="slot2"><div class="drawn-card-back">A26</div></div>
+        <div class="drawn-card-slot" id="slot3"><div class="drawn-card-back">A26</div></div>
+      </div>
+      <div class="matches-display" id="matchesDisplay"></div>
+    </div>
   </div>
 
-  <!-- RIGHT: TABLE -->
+  <!-- RIGHT: TABLE WITH 6 HOUSES -->
   <div class="table-pane">
 
-    <!-- SCOREBOARD -->
-    <div class="scoreboard" id="scoreboard"></div>
+    <!-- SCOREBOARD / HISTORY -->
+    <div class="scoreboard" id="scoreboard">
+      <div class="scoreboard-empty">No rounds yet</div>
+    </div>
 
-    <!-- PLAYER / BANKER HANDS -->
-    <div class="hands-area">
-      <div class="hand-zone hand-player" id="handPlayer">
-        <div class="hand-label">PLAYER</div>
-        <div class="hand-cards" id="playerCards"></div>
-        <div class="hand-score" id="playerScore">0</div>
-      </div>
-      <div class="vs-divider">VS</div>
-      <div class="hand-zone hand-banker" id="handBanker">
-        <div class="hand-label">BANKER</div>
-        <div class="hand-cards" id="bankerCards"></div>
-        <div class="hand-score" id="bankerScore">0</div>
+    <!-- TABLE WITH 6 HOUSES -->
+    <div class="table-container">
+      <div class="table-felt">
+        <div class="table-title">A26 GAME TABLE</div>
+        <div class="houses-grid" id="housesGrid"></div>
+        <div class="table-footer">
+          <div class="payout-info">
+            <span><strong>1 Match</strong> · 1:1</span>
+            <span><strong>2 Matches</strong> · 1:2</span>
+            <span><strong>3 Matches</strong> · 1:4</span>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- RESULT BANNER -->
     <div class="result-banner" id="resultBanner"></div>
 
-    <!-- BETTING ZONES -->
-    <div class="betting-grid">
-      <div class="bet-tile bet-player" data-bet="player">
-        <div class="bet-tile-label">PLAYER</div>
-        <div class="bet-tile-odds">1 : 1</div>
-        <div class="bet-tile-chips" id="chips-player"></div>
+    <!-- BETTING PANEL -->
+    <div class="betting-panel">
+      <div class="bet-header">
+        <h3>Place Your Bet</h3>
+        <div class="selected-house-display" id="selectedHouseDisplay">Select a house</div>
       </div>
-      <div class="bet-tile bet-tie" data-bet="tie">
-        <div class="bet-tile-label">TIE</div>
-        <div class="bet-tile-odds">8 : 1</div>
-        <div class="bet-tile-chips" id="chips-tie"></div>
-      </div>
-      <div class="bet-tile bet-banker" data-bet="banker">
-        <div class="bet-tile-label">BANKER</div>
-        <div class="bet-tile-odds">0.95 : 1</div>
-        <div class="bet-tile-chips" id="chips-banker"></div>
-      </div>
-      <div class="bet-tile bet-side" data-bet="playerPair">
-        <div class="bet-tile-label">P PAIR</div>
-        <div class="bet-tile-odds">11 : 1</div>
-        <div class="bet-tile-chips" id="chips-playerPair"></div>
-      </div>
-      <div class="bet-tile bet-side" data-bet="bankerPair">
-        <div class="bet-tile-label">B PAIR</div>
-        <div class="bet-tile-odds">11 : 1</div>
-        <div class="bet-tile-chips" id="chips-bankerPair"></div>
-      </div>
-    </div>
 
-    <!-- CHIP SELECTOR + CONTROLS -->
-    <div class="control-bar">
       <div class="chip-row">
         <button class="chip chip-2000" data-value="2000">₹2K</button>
         <button class="chip chip-5000" data-value="5000">₹5K</button>
         <button class="chip chip-10000" data-value="10000">₹10K</button>
-        <button class="chip chip-25000" data-value="25000">₹25K</button>
-        <button class="chip chip-50000" data-value="50000">₹50K</button>
+        <button class="chip chip-20000" data-value="20000">₹20K</button>
+        <button class="chip-40000 chip" data-value="40000">₹40K</button>
+        <button class="chip chip-60000" data-value="60000">₹60K</button>
       </div>
+
+      <div class="bet-amount-section">
+        <label>Amount (₹)</label>
+        <input type="number" class="bet-input" id="betInput" min="2000" max="60000" step="1000" placeholder="2,000 - 60,000">
+      </div>
+
       <div class="control-buttons">
         <button class="btn-clear" id="btnClear">CLEAR</button>
         <button class="btn-deal" id="btnDeal" disabled>DEAL</button>
       </div>
     </div>
 
-    <!-- BALANCE + TOTAL BET -->
+    <!-- BALANCE BAR -->
     <div class="balance-bar">
       <div class="balance-item">
         <span class="label">Balance</span>
@@ -163,25 +167,43 @@
   </div>
 </div>
 
+<!-- RESULT MODAL -->
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-modal">
+    <h2 id="resultTitle">Result</h2>
+    <div class="result-detail" id="resultCards"></div>
+    <div class="result-detail" id="resultMatches"></div>
+    <div id="resultAmount"></div>
+    <button class="btn-close" id="btnNewRound">New Round</button>
+  </div>
+</div>
+
 <!-- RULES -->
-<button class="rules-toggle" onclick="toggleRules()">?</button>
+<button class="rules-toggle" id="btnRules" aria-label="Rules">?</button>
 <div class="rules-panel" id="rulesPanel">
-  <h3>Speed Baccarat Rules</h3>
-  <p><strong>Goal:</strong> Bet on which hand (Player or Banker) will have a total closest to 9.</p>
-  <p><strong>Card Values:</strong> A=1, 2-9=face value, 10/J/Q/K=0. Hand total = sum mod 10.</p>
-  <p><strong>Naturals:</strong> 8 or 9 on first 2 cards = natural win/stand.</p>
-  <p><strong>Third Card:</strong> Player stands on 6-7, draws on 0-5. Banker rules depend on Player's third card.</p>
+  <h3>How to Play A26</h3>
+  <p><strong>1.</strong> Six houses on the table: <strong>A, 2, 3, 4, 5, 6</strong>.</p>
+  <p><strong>2.</strong> Select one or more houses and bet between <strong>₹2,000</strong> and <strong>₹60,000</strong> per house.</p>
+  <p><strong>3.</strong> The dealer shuffles the deck, lets a player cut, then draws <strong>3 random cards</strong>.</p>
+  <p><strong>4.</strong> If a card's value matches the house you bet on, you win!</p>
   <table class="payout-table">
-    <tr><td>Player Wins</td><td>1 : 1</td></tr>
-    <tr><td>Banker Wins</td><td>0.95 : 1 (5% commission)</td></tr>
-    <tr><td>Tie</td><td>8 : 1</td></tr>
-    <tr><td>Player Pair</td><td>11 : 1</td></tr>
-    <tr><td>Banker Pair</td><td>11 : 1</td></tr>
+    <tr><td>1 Match</td><td>1 : 1</td></tr>
+    <tr><td>2 Matches</td><td>1 : 2</td></tr>
+    <tr><td>3 Matches</td><td>1 : 4</td></tr>
   </table>
-  <p><strong>Speed Baccarat:</strong> Faster rounds, ~12 second betting window.</p>
+  <p><strong>Example:</strong> Bet ₹5,000 on house "A". If 2 of the 3 cards are Aces, you win ₹10,000 (1:2).</p>
+  <p><strong>Card Values:</strong> A = Ace · 2-10 = face value · J, Q, K count as their rank only when house matches.</p>
 </div>
 
 <script src="/js/auth.js"></script>
 <script src="/js/game.js"></script>
+<script>
+// PWA service worker registration
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.log('SW registration failed:', err));
+  });
+}
+</script>
 </body>
 </html>
