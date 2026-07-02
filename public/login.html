@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A26 - Login</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="auth-page">
+<div class="auth-container">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <h1>A26</h1>
+      <p class="subtitle">Casino Card Game</p>
+    </div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">Login</button>
+      <button class="auth-tab" data-tab="register">Register</button>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <form id="loginForm" class="auth-form active">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="loginUsername" required autocomplete="username" placeholder="Enter username">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="Enter password">
+      </div>
+      <div class="form-error" id="loginError"></div>
+      <button type="submit" class="btn btn-primary btn-full">Login</button>
+    </form>
+
+    <!-- REGISTER FORM -->
+    <form id="registerForm" class="auth-form">
+      <div class="form-group">
+        <label>Username</label>
+        <input type="text" id="regUsername" required placeholder="Choose a username" minlength="3">
+      </div>
+      <div class="form-group">
+        <label>Password</label>
+        <input type="password" id="regPassword" required placeholder="Create password" minlength="6">
+      </div>
+      <div class="form-group">
+        <label>Confirm Password</label>
+        <input type="password" id="regConfirm" required placeholder="Confirm password">
+      </div>
+      <div class="form-group">
+        <label>Phone (optional)</label>
+        <input type="tel" id="regPhone" placeholder="Phone number">
+      </div>
+      <div class="form-group">
+        <label>Email (optional)</label>
+        <input type="email" id="regEmail" placeholder="Email address">
+      </div>
+      <div class="form-error" id="regError"></div>
+      <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+    </form>
+
+    <div class="auth-footer">
+      <p>Demo admin: <strong>admin</strong> / <strong>admin123</strong></p>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+// Redirect if already logged in
+if (Auth.isLoggedIn()) {
+  const user = Auth.getUser();
+  window.location.href = user.role === 'admin' ? '/admin.html' : '/dashboard.html';
+}
+
+// Tab switching
+document.querySelectorAll('.auth-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.tab + 'Form').classList.add('active');
+  });
+});
+
+// Login
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('loginError');
+  errEl.textContent = '';
+
+  try {
+    const data = await Auth.api('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: document.getElementById('loginUsername').value,
+        password: document.getElementById('loginPassword').value
+      })
+    });
+
+    Auth.setAuth(data.token, data.user);
+    window.location.href = data.user.role === 'admin' ? '/admin.html' : '/dashboard.html';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+
+// Register
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errEl = document.getElementById('regError');
+  errEl.textContent = '';
+
+  const password = document.getElementById('regPassword').value;
+  const confirm = document.getElementById('regConfirm').value;
+
+  if (password !== confirm) {
+    errEl.textContent = 'Passwords do not match';
+    return;
+  }
+
+  try {
+    const data = await Auth.api('/api/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: document.getElementById('regUsername').value,
+        password,
+        phone: document.getElementById('regPhone').value,
+        email: document.getElementById('regEmail').value
+      })
+    });
+
+    Auth.setAuth(data.token, data.user);
+    window.location.href = '/dashboard.html';
+  } catch (err) {
+    errEl.textContent = err.message;
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A26 - Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="top-nav">
+  <a href="/admin.html" class="nav-brand">A26 Admin</a>
+  <div class="nav-info">
+    <span class="nav-user" id="nav-user"></span>
+    <span class="nav-role badge badge-admin" id="nav-role">Admin</span>
+    <div class="nav-links">
+      <a href="/index.html">Play Game</a>
+      <a href="#" id="nav-logout">Logout</a>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-container">
+  <!-- ADMIN STATS -->
+  <div class="dashboard-card">
+    <h2>System Overview</h2>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">Total Players</div>
+        <div class="stat-value" id="adminPlayers">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Total Rounds</div>
+        <div class="stat-value" id="adminRounds">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Total Bets</div>
+        <div class="stat-value" id="adminTotalBets">₹0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Total Payout</div>
+        <div class="stat-value" id="adminPayout">₹0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">House Profit</div>
+        <div class="stat-value" id="adminProfit">₹0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Active Rounds</div>
+        <div class="stat-value" id="adminActive">0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROUND MANAGEMENT -->
+  <div class="dashboard-card">
+    <h2>Round Management</h2>
+    <div class="admin-actions">
+      <button class="btn btn-success btn-sm" onclick="createRound()">Create New Round</button>
+    </div>
+    <div id="roundsTable">
+      <p style="color: var(--gold); opacity: 0.6;">Loading rounds...</p>
+    </div>
+  </div>
+
+  <!-- PLAYER MANAGEMENT -->
+  <div class="dashboard-card">
+    <h2>Player Management</h2>
+    <div id="playersTable">
+      <p style="color: var(--gold); opacity: 0.6;">Loading players...</p>
+    </div>
+  </div>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+Auth.requireAdmin();
+Auth.updateNav();
+
+// Load admin stats
+async function loadStats() {
+  try {
+    const data = await Auth.api('/api/admin/stats');
+    document.getElementById('adminPlayers').textContent = data.totalPlayers;
+    document.getElementById('adminRounds').textContent = data.totalRounds;
+    document.getElementById('adminTotalBets').textContent = '₹' + data.totalBets.toLocaleString('en-IN');
+    document.getElementById('adminPayout').textContent = '₹' + data.totalPayout.toLocaleString('en-IN');
+    
+    const profitEl = document.getElementById('adminProfit');
+    profitEl.textContent = '₹' + data.profit.toLocaleString('en-IN');
+    profitEl.className = 'stat-value ' + (data.profit >= 0 ? 'positive' : 'negative');
+    
+    document.getElementById('adminActive').textContent = data.activeRounds;
+  } catch (err) {
+    console.error('Failed to load stats:', err);
+  }
+}
+
+// Load rounds
+async function loadRounds() {
+  try {
+    const data = await Auth.api('/api/admin/rounds');
+    const container = document.getElementById('roundsTable');
+    
+    if (data.rounds.length === 0) {
+      container.innerHTML = '<p style="color: var(--gold); opacity: 0.6;">No rounds yet</p>';
+      return;
+    }
+    
+    container.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Round ID</th>
+            <th>Status</th>
+            <th>Cards</th>
+            <th>Total Bets</th>
+            <th>Payout</th>
+            <th>Profit</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.rounds.map(round => `
+            <tr>
+              <td>#${round.id.slice(-8)}</td>
+              <td><span class="badge ${round.status === 'completed' ? 'badge-win' : 'badge-player'}">${round.status}</span></td>
+              <td>${round.cards.length > 0 ? round.cards.map(c => c.value + c.suit).join(' ') : '-'}</td>
+              <td>₹${round.totalBets.toLocaleString('en-IN')}</td>
+              <td>₹${round.totalPayout.toLocaleString('en-IN')}</td>
+              <td style="color: ${round.profit >= 0 ? '#2ecc71' : '#c41e3a'}">₹${round.profit.toLocaleString('en-IN')}</td>
+              <td>
+                ${round.status === 'open' ? `<button class="btn btn-danger btn-sm" onclick="dealRound('${round.id}')">Deal</button>` : '-'}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    console.error('Failed to load rounds:', err);
+  }
+}
+
+// Load players
+async function loadPlayers() {
+  try {
+    const data = await Auth.api('/api/admin/players');
+    const container = document.getElementById('playersTable');
+    
+    if (data.players.length === 0) {
+      container.innerHTML = '<p style="color: var(--gold); opacity: 0.6;">No players registered yet</p>';
+      return;
+    }
+    
+    container.innerHTML = `
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Balance</th>
+            <th>Total Bets</th>
+            <th>Winnings</th>
+            <th>Joined</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.players.map(player => `
+            <tr>
+              <td>${player.username}</td>
+              <td>₹${player.balance.toLocaleString('en-IN')}</td>
+              <td>${player.totalBets}</td>
+              <td>₹${player.totalWinnings.toLocaleString('en-IN')}</td>
+              <td>${new Date(player.createdAt).toLocaleDateString()}</td>
+              <td>
+                <button class="btn btn-sm" style="background: var(--gold); color: #1a1a1a;" onclick="adjustBalance('${player.id}', ${player.balance})">Adjust</button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  } catch (err) {
+    console.error('Failed to load players:', err);
+  }
+}
+
+// Create new round
+async function createRound() {
+  try {
+    await Auth.api('/api/admin/rounds', { method: 'POST' });
+    loadRounds();
+    loadStats();
+  } catch (err) {
+    alert('Failed to create round: ' + err.message);
+  }
+}
+
+// Deal cards for round
+async function dealRound(roundId) {
+  if (!confirm('Deal cards for this round?')) return;
+  
+  try {
+    const data = await Auth.api(`/api/admin/rounds/${roundId}/deal`, { method: 'POST' });
+    alert(`Cards dealt: ${data.round.cards.map(c => c.value + c.suit).join(', ')}`);
+    loadRounds();
+    loadStats();
+    loadPlayers();
+  } catch (err) {
+    alert('Failed to deal: ' + err.message);
+  }
+}
+
+// Adjust player balance
+function adjustBalance(playerId, currentBalance) {
+  const newBalance = prompt('Enter new balance for this player:', currentBalance);
+  if (newBalance === null) return;
+  
+  const amount = parseInt(newBalance);
+  if (isNaN(amount) || amount < 0) {
+    alert('Invalid amount');
+    return;
+  }
+  
+  Auth.api(`/api/admin/players/${playerId}/balance`, {
+    method: 'PUT',
+    body: JSON.stringify({ balance: amount })
+  }).then(() => {
+    loadPlayers();
+    alert('Balance updated successfully');
+  }).catch(err => {
+    alert('Failed to update: ' + err.message);
+  });
+}
+
+// Initial load
+loadStats();
+loadRounds();
+loadPlayers();
+
+// Refresh every 10 seconds
+setInterval(() => {
+  loadStats();
+  loadRounds();
+}, 10000);
+</script>
+</body>
+</html>

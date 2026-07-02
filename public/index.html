@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>A26 - Casino Card Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="top-nav">
+  <a href="/index.html" class="nav-brand">A26</a>
+  <div class="nav-info">
+    <span class="nav-user" id="nav-user"></span>
+    <span class="nav-balance" id="nav-balance">₹0</span>
+    <div class="nav-links">
+      <a href="/dashboard.html">Dashboard</a>
+      <a href="#" id="nav-logout">Logout</a>
+    </div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="header">
+  <h1>A26</h1>
+  <div class="subtitle">Casino Card Game</div>
+</div>
+
+<!-- DEALER WITH AI IMAGE -->
+<div class="dealer-section">
+  <div class="dealer-image-container">
+    <img src="/dealer.png" alt="Priya - Dealer" class="dealer-image" id="dealerImage">
+  </div>
+  <div class="dealer-name">Priya</div>
+  <div class="dealer-status" id="dealerStatus">Place your bets</div>
+</div>
+
+<!-- BALANCE BAR -->
+<div class="balance-bar">
+  <div class="balance-item">
+    <span class="label">Balance</span>
+    <span class="value" id="balance">₹0</span>
+  </div>
+  <div class="balance-item">
+    <span class="label">Total Bet</span>
+    <span class="value" id="totalBet">₹0</span>
+  </div>
+  <div class="balance-item">
+    <span class="label">Round</span>
+    <span class="value" id="roundNum">1</span>
+  </div>
+</div>
+
+<!-- CARD DISPLAY -->
+<div class="card-display" id="cardDisplay">
+  <div class="card-slot" id="card1"><div class="card-back"></div><div class="card-face"><span class="card-value"></span><span class="card-suit"></span></div></div>
+  <div class="card-slot" id="card2"><div class="card-back"></div><div class="card-face"><span class="card-value"></span><span class="card-suit"></span></div></div>
+  <div class="card-slot" id="card3"><div class="card-back"></div><div class="card-face"><span class="card-value"></span><span class="card-suit"></span></div></div>
+</div>
+
+<!-- TABLE WITH HOUSES -->
+<div class="table-container">
+  <div class="table-felt">
+    <div class="houses-grid" id="housesGrid"></div>
+  </div>
+</div>
+
+<!-- BETTING PANEL -->
+<div class="betting-panel">
+  <div class="bet-controls">
+    <div class="bet-header">
+      <h3>Place Your Bet</h3>
+      <div class="selected-house-display" id="selectedHouseDisplay">Select a house</div>
+    </div>
+    <div class="bet-amount-section">
+      <label>Amount (₹)</label>
+      <input type="number" class="bet-input" id="betInput" min="2000" max="60000" step="1000" placeholder="2,000 - 60,000">
+    </div>
+    <div class="quick-bets">
+      <button class="quick-bet" data-amount="2000">₹2,000</button>
+      <button class="quick-bet" data-amount="5000">₹5,000</button>
+      <button class="quick-bet" data-amount="10000">₹10,000</button>
+      <button class="quick-bet" data-amount="20000">₹20,000</button>
+      <button class="quick-bet" data-amount="40000">₹40,000</button>
+      <button class="quick-bet" data-amount="60000">₹60,000</button>
+    </div>
+    <div class="action-buttons">
+      <button class="btn btn-clear" id="btnClear" onclick="clearBets()">Clear Bets</button>
+      <button class="btn btn-deal" id="btnDeal" onclick="dealCards()" disabled>Deal Cards</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY -->
+<div class="history-section">
+  <div class="history-title">Round History</div>
+  <div class="history-list" id="historyList"></div>
+</div>
+
+<!-- RESULT OVERLAY -->
+<div class="result-overlay" id="resultOverlay">
+  <div class="result-modal">
+    <h2 id="resultTitle">Result</h2>
+    <div class="result-detail" id="resultCards"></div>
+    <div class="result-detail" id="resultMatches"></div>
+    <div id="resultAmount"></div>
+    <button class="btn-close" onclick="closeResult()">New Round</button>
+  </div>
+</div>
+
+<!-- RULES -->
+<button class="rules-toggle" onclick="toggleRules()">?</button>
+<div class="rules-panel" id="rulesPanel">
+  <h3>How to Play</h3>
+  <p>1. Select one or more houses (A, 2, 3, 4, 5, 6) and place bets between ₹2,000 and ₹60,000 on each.</p>
+  <p>2. Priya (the dealer) shuffles the deck and draws 3 cards randomly.</p>
+  <p>3. If a card matches your house number, you win!</p>
+  <table class="payout-table">
+    <tr><td>1 Match</td><td>1:1 payout</td></tr>
+    <tr><td>2 Matches</td><td>1:2 payout</td></tr>
+    <tr><td>3 Matches</td><td>1:4 payout</td></tr>
+  </table>
+  <p>Example: Bet ₹5,000 on house "A". If 2 of the 3 cards are Aces, you win ₹10,000.</p>
+</div>
+
+<script src="/js/auth.js"></script>
+<script src="/js/game.js"></script>
+</body>
+</html>

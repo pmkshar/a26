@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A26 - Player Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+
+<!-- TOP NAV -->
+<div class="top-nav">
+  <a href="/index.html" class="nav-brand">A26</a>
+  <div class="nav-info">
+    <span class="nav-user" id="nav-user"></span>
+    <span class="nav-balance" id="nav-balance">₹0</span>
+    <div class="nav-links">
+      <a href="/dashboard.html">Dashboard</a>
+      <a href="#" id="nav-logout">Logout</a>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-container">
+  <!-- WELCOME -->
+  <div class="dashboard-card">
+    <h2>Welcome, <span id="playerName">Player</span></h2>
+    <p style="color: var(--gold); opacity: 0.8; margin-top: 5px;">Your personal gaming dashboard</p>
+  </div>
+
+  <!-- STATS -->
+  <div class="dashboard-card">
+    <h2>Your Statistics</h2>
+    <div class="stats-grid">
+      <div class="stat-box">
+        <div class="stat-label">Balance</div>
+        <div class="stat-value" id="statBalance">₹0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Rounds Played</div>
+        <div class="stat-value" id="statRounds">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Total Bets</div>
+        <div class="stat-value" id="statTotalBets">₹0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Total Wins</div>
+        <div class="stat-value positive" id="statTotalWins">₹0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Net Profit</div>
+        <div class="stat-value" id="statNetProfit">₹0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value" id="statWinRate">0%</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECENT ACTIVITY -->
+  <div class="dashboard-card">
+    <h2>Recent Activity</h2>
+    <div id="activityList">
+      <p style="color: var(--gold); opacity: 0.6; text-align: center; padding: 20px;">No activity yet. Start playing!</p>
+    </div>
+  </div>
+
+  <!-- PLAY BUTTON -->
+  <div style="text-align: center; margin-top: 30px;">
+    <a href="/index.html" class="btn btn-primary" style="display: inline-block; text-decoration: none; padding: 15px 40px; font-size: 1.1rem;">Play Now</a>
+  </div>
+</div>
+
+<script src="/js/auth.js"></script>
+<script>
+Auth.requireAuth();
+Auth.updateNav();
+
+const user = Auth.getUser();
+document.getElementById('playerName').textContent = user.username;
+
+// Load dashboard data
+async function loadDashboard() {
+  try {
+    const data = await Auth.api('/api/player/dashboard');
+    
+    document.getElementById('statBalance').textContent = '₹' + data.user.balance.toLocaleString('en-IN');
+    document.getElementById('statRounds').textContent = data.stats.roundsPlayed;
+    document.getElementById('statTotalBets').textContent = '₹' + data.stats.totalBets.toLocaleString('en-IN');
+    document.getElementById('statTotalWins').textContent = '₹' + data.stats.totalWins.toLocaleString('en-IN');
+    
+    const netProfit = data.stats.netProfit;
+    const netEl = document.getElementById('statNetProfit');
+    netEl.textContent = '₹' + Math.abs(netProfit).toLocaleString('en-IN');
+    netEl.className = 'stat-value ' + (netProfit >= 0 ? 'positive' : 'negative');
+    
+    document.getElementById('statWinRate').textContent = data.stats.winRate + '%';
+    
+    // Activity list
+    const activityList = document.getElementById('activityList');
+    if (data.recentBets.length > 0) {
+      activityList.innerHTML = `
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Round</th>
+              <th>House</th>
+              <th>Bet</th>
+              <th>Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${data.recentBets.map(bet => `
+              <tr>
+                <td>#${bet.roundId.slice(-6)}</td>
+                <td>${bet.house}</td>
+                <td>₹${bet.amount.toLocaleString('en-IN')}</td>
+                <td>
+                  <span class="badge ${bet.winnings > 0 ? 'badge-win' : 'badge-lose'}">
+                    ${bet.winnings > 0 ? '+₹' + bet.winnings.toLocaleString('en-IN') : 'Loss'}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+  } catch (err) {
+    console.error('Failed to load dashboard:', err);
+  }
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
