@@ -1027,6 +1027,103 @@ body::before {
 
 .bet-input::placeholder { color: rgba(250,243,224,0.4); }
 
+/* === BET INSTRUCTIONS === */
+.bet-instructions {
+  background: rgba(212,168,67,0.08);
+  border: 1px solid rgba(212,168,67,0.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  font-size: 0.78rem;
+  color: var(--gold-light);
+  line-height: 1.4;
+}
+.bet-instructions strong { color: var(--gold); }
+
+.bet-input-hint {
+  width: 100%;
+  font-size: 0.68rem;
+  color: rgba(250,243,224,0.5);
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* === BET SUMMARY (active bets list) === */
+.bet-summary {
+  background: rgba(0,0,0,0.3);
+  border: 1px solid rgba(212,168,67,0.25);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.bet-summary-title {
+  font-size: 0.7rem;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.bet-summary-empty {
+  font-size: 0.75rem;
+  color: rgba(250,243,224,0.4);
+  text-align: center;
+  padding: 6px 0;
+  font-style: italic;
+}
+.bet-summary-item {
+  display: grid;
+  grid-template-columns: 70px 1fr 80px 24px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 0.78rem;
+  border-bottom: 1px solid rgba(212,168,67,0.1);
+}
+.bet-summary-item:last-child { border-bottom: none; }
+.bet-summary-item.at-max .bsi-amount { color: #ffd700; font-weight: 700; }
+.bsi-house {
+  color: var(--gold-light);
+  font-weight: 700;
+}
+.bsi-bar {
+  height: 6px;
+  background: rgba(0,0,0,0.4);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.bsi-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold), var(--gold-light));
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.bet-summary-item.at-max .bsi-fill {
+  background: linear-gradient(90deg, #ffd700, #ffaa00);
+}
+.bsi-amount {
+  color: var(--gold-light);
+  font-weight: 600;
+  text-align: right;
+}
+.bsi-remove {
+  background: rgba(220,53,69,0.2);
+  border: 1px solid rgba(220,53,69,0.4);
+  color: #ff6b6b;
+  border-radius: 4px;
+  width: 22px;
+  height: 22px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+  line-height: 1;
+}
+.bsi-remove:hover {
+  background: rgba(220,53,69,0.4);
+  color: #fff;
+}
+
 .control-buttons {
   display: flex;
   gap: 8px;
@@ -1810,39 +1907,55 @@ body::before {
   opacity: 1;
 }
 
-/* === MOUTH VISEME FRAMES (lip-sync flip-book) === */
-/* Photorealistic mouth-shape variants of the SAME dealer face. Stacked
-   above the pose image; we cycle their .active class during speech to
-   create the illusion of natural talking. The flip-book runs at ~8 FPS
-   (120ms per frame) which is fast enough for the eye to perceive
-   continuous lip motion. */
-.dh-mouth-img {
+/* === SVG MOUTH OVERLAY (precise viseme morphing) === */
+/* A single SVG mouth sits on top of the static dealer face photo.
+   The SVG <path> elements morph between 7 viseme shapes (rest, closed,
+   small, medium, wide, O, smile) with a 160ms CSS transition, producing
+   smooth, accurate lip motion that matches the rhythm of speech.
+   This replaces the old AI-generated mouth variant flip-book which
+   caused whole-face jitter between frames. */
+.dh-mouth-overlay {
   position: absolute;
-  bottom: 0;
+  /* Position the mouth on the lower-center of the face where lips
+     naturally appear on the dealer portrait. Tuned for the 768x1344
+     photorealistic dealer images. */
+  bottom: 30%;
   left: 50%;
-  transform: translateX(-50%);
-  height: 100%;
-  width: auto;
-  max-width: 115%;
-  object-fit: cover;
-  object-position: center 18%;
-  opacity: 0;
+  transform: translateX(-50%) translateY(var(--jaw-drop, 0px));
+  width: 18%;
+  max-width: 140px;
+  min-width: 70px;
+  height: auto;
   pointer-events: none;
-  will-change: opacity;
-  z-index: 7;
-  /* No transition — instant snap between visemes for crisp flip-book */
+  z-index: 8;
+  filter: drop-shadow(0 2px 3px rgba(0,0,0,0.4));
+  transition: transform 0.16s ease-out;
 }
-.dh-mouth-img.active {
+.dh-mouth-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+/* Smooth morph transition on the path shapes */
+.dh-mouth-outer,
+.dh-mouth-inner,
+.dh-mouth-teeth {
+  transition: d 0.16s ease-out, opacity 0.16s ease-out;
+}
+/* Mouth overlay is subtle when idle, full opacity when speaking.
+   The .speaking class is toggled on .dh-image-wrap by JS. */
+.dh-image-wrap .dh-mouth-overlay {
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+.dh-image-wrap.speaking .dh-mouth-overlay {
   opacity: 1;
 }
-/* When the fallback CSS mouth is speaking (and real frames aren't loaded),
-   keep the mouth-img layer hidden so we don't get a static frame stuck
-   on top of the photo. */
-.dh-image-wrap:not(.frames-ready) .dh-mouth-img { display: none; }
 
-/* Keep the old CSS mouth overlay below the new viseme layer so it only
-   shows as a fallback when real frames aren't loaded. */
-.dh-mouth { z-index: 5; }
+/* Legacy mouth-img (AI variants) — kept hidden, replaced by SVG overlay */
+.dh-mouth-img { display: none !important; }
+.dh-mouth { display: none !important; }
 
 /* === SPEECH BUBBLE === */
 .dh-bubble {

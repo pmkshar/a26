@@ -136,18 +136,48 @@ function initHouses() {
       <div class="house-max-label">Max \u20B960,000</div>
       <div class="house-bets" id="bets-${h}"></div>
     `;
-    div.addEventListener('click', () => selectHouse(h));
+    // Normal click: toggle selection
+    div.addEventListener('click', (ev) => selectHouse(h, ev));
+    // Shift-click: remove the bet from this house (refund)
+    div.addEventListener('contextmenu', (ev) => {
+      ev.preventDefault();
+      removeBetFromHouse(h);
+    });
     grid.appendChild(div);
   });
 }
 
-function selectHouse(house) {
+function selectHouse(house, ev) {
   if (isDealing || !isBettingOpen) return;
+  // Shift+click removes the bet
+  if (ev && ev.shiftKey) {
+    removeBetFromHouse(house);
+    return;
+  }
   document.querySelectorAll('.house').forEach(el => {
     if (el.dataset.house === house) el.classList.toggle('selected');
   });
   updateHouseSelectionDisplay();
   updateDealButton();
+}
+
+// Remove the entire bet from a house and refund the player
+function removeBetFromHouse(house) {
+  if (isDealing || !isBettingOpen) return;
+  if (!bets[house]) {
+    flashMessage(`No bet on house ${house} to remove`);
+    return;
+  }
+  const refund = bets[house];
+  balance += refund;
+  totalBet -= refund;
+  delete bets[house];
+  renderChipsOnHouse(house);
+  updateBalanceUI();
+  updateHouseSelectionDisplay();
+  updateBetSummary();
+  updateDealButton();
+  flashMessage(`Removed ₹${refund.toLocaleString('en-IN')} from house ${house}`);
 }
 
 function updateHouseSelectionDisplay() {
@@ -216,6 +246,7 @@ function placeBet(house, amount) {
   updateBalanceUI();
   renderChipsOnHouse(house);
   updateHouseSelectionDisplay();
+  updateBetSummary();
   updateDealButton();
   // Pulse the house
   const houseEl = document.querySelector(`.house[data-house="${house}"]`);
@@ -223,6 +254,29 @@ function placeBet(house, amount) {
   setTimeout(() => houseEl.classList.remove('pulse'), 400);
   // Dealer acknowledges bet
   if (dhReady) DigitalHuman.say('betPlaced');
+}
+
+// Render the active bets summary panel
+function updateBetSummary() {
+  const list = document.getElementById('betSummaryList');
+  if (!list) return;
+  const entries = Object.entries(bets).filter(([h, amt]) => amt > 0);
+  if (entries.length === 0) {
+    list.innerHTML = '<div class="bet-summary-empty">No bets placed yet</div>';
+    return;
+  }
+  list.innerHTML = entries.map(([house, amt]) => {
+    const pct = Math.min(100, Math.round(amt / MAX_BET * 100));
+    const atMax = amt >= MAX_BET;
+    return `
+      <div class="bet-summary-item ${atMax ? 'at-max' : ''}">
+        <span class="bsi-house">House ${house}</span>
+        <div class="bsi-bar"><div class="bsi-fill" style="width:${pct}%"></div></div>
+        <span class="bsi-amount">₹${amt.toLocaleString('en-IN')}</span>
+        <button class="bsi-remove" onclick="removeBetFromHouse('${house}')" title="Remove bet">✕</button>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderChipsOnHouse(house) {
@@ -279,6 +333,7 @@ function clearBets() {
   document.getElementById('selectedHouseDisplay').textContent = 'Select one or more houses';
   document.getElementById('betInput').value = '';
   updateBalanceUI();
+  updateBetSummary();
   updateDealButton();
 }
 

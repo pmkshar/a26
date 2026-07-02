@@ -1,26 +1,29 @@
 /* ============================================================
-   A26 — AI DIGITAL HUMAN DEALER (Real Talking Edition v6)
+   A26 — AI DIGITAL HUMAN DEALER (Real Talking Edition v7)
    ------------------------------------------------------------
-   This edition upgrades the dealer from "CSS ellipse mouth" to
-   REAL photorealistic mouth-shape frames (visemes) cycled as a
-   flip-book during speech — synced to actual word boundaries
-   from the Web Speech API. The result: the dealer looks like
-   she is genuinely speaking, not just glowing.
+   Major upgrade over v6: replaces AI-generated mouth variant
+   images (which caused whole-face jitter) with a precise SVG
+   mouth overlay that sits ON TOP of a single static face. The
+   SVG morphs smoothly between 7 viseme shapes synced to word
+   boundaries — giving accurate, smooth lip movement without
+   any face vibration.
+
+   Voice is slowed to Indian-English conversational pace
+   (rate 0.85, pitch 0.98) with en-IN voice preference.
 
    Features:
    - 6 photorealistic POSE images (idle/shuffling/cutting/dealing/
      reveal-win/reveal-lose) — crossfade between game phases.
-   - 5 photorealistic MOUTH viseme frames (small/medium/wide/O/smile)
-     — flip-book cycled at ~8 FPS during speech, replaces the
-     flat CSS ellipse with real lip movement.
-   - 4 photorealistic EMOTION face variants (happy/surprised/thinking/sad)
-     — crossfade over the active pose when emotion changes.
-   - 6 phoneme-driven mouth shapes synced to onboundary word events
-     (each word triggers a different viseme for natural lip motion).
-   - Subtle CSS animations layered on top: breathing scale,
-     micro-sway, eyelid blinks, eye-glint flashes.
-   - Web Speech API voice with female voice selection + emotional
-     pitch/rate modulation.
+   - SVG MOUTH OVERLAY with 7 viseme shapes (closed/rest/small/
+     medium/wide/O/smile) — smooth 180ms morph transitions,
+     synced to onboundary word events from Web Speech API.
+   - Jaw-drop micro-transform for natural syllable rhythm.
+   - 4 photorealistic EMOTION face variants (happy/surprised/
+     thinking/sad) — crossfade over active pose on emotion change.
+   - Subtle CSS animations: breathing scale, micro-sway,
+     eyelid blinks, eye-glint flashes.
+   - Web Speech API voice: en-IN female, slowed to 0.85 rate
+     for clear Indian-English delivery.
    - Emotive dialogue engine (12 contextual states).
    ============================================================ */
 
@@ -37,32 +40,55 @@
     'reveal-lose':'/images/dealers/real_reveal_lose.png'
   };
 
-  // ---------- MOUTH VISEME FRAMES (lip-sync flip-book) ----------
-  // These are the SAME dealer face with different mouth shapes.
-  // Stacked as <img> layers; we cycle their .active class during
-  // speech to create the illusion of talking.
-  // Frame keys correspond to phoneme groups; the cycle order is
-  // designed to look natural when sampled by word-boundary events.
-  const MOUTH_FRAMES = [
-    { key: 'closed', src: '/images/dealers/real_mouth_smile.png' },
-    { key: 'small',  src: '/images/dealers/real_mouth_small.png'  },
-    { key: 'medium', src: '/images/dealers/real_mouth_medium.png' },
-    { key: 'wide',   src: '/images/dealers/real_mouth_wide.png'   },
-    { key: 'O',      src: '/images/dealers/real_mouth_O.png'      }
-  ];
-
   // ---------- EMOTION FACE VARIANTS (crossfade for expression) ----------
-  // These are full-face variants that crossfade over the active pose
-  // when an emotion is set. Falls back to CSS filter if missing.
   const EMOTION_FACES = {
     happy:     '/images/dealers/real_emotion_happy.png',
     surprised: '/images/dealers/real_emotion_surprised.png',
     thinking:  '/images/dealers/real_emotion_thinking.png',
     sad:       '/images/dealers/real_emotion_sad.png'
-    // neutral/playful/excited/ecstatic/serious fall back to CSS filter on the base pose
   };
 
-  // ---------- VOICE MANAGER ----------
+  // ---------- VISEME SHAPES (SVG path definitions for the mouth) ----------
+  // Each viseme is an SVG <path> drawn in a 100x40 viewBox.
+  // The mouth overlay morphs between these smoothly using CSS
+  // transitions on the <path d=""> attribute (via JS interpolation
+  // would be complex; instead we swap paths with a 180ms opacity
+  // crossfade between two stacked SVG layers).
+  //
+  // Viseme guide (based on Preston-Blair phoneme set, simplified):
+  //   rest    — lips together, relaxed (default, between words)
+  //   closed  — pressed closed (M, B, P sounds)
+  //   small   — slightly open (E, I, slight A)
+  //   medium  — open moderate (most vowels)
+  //   wide    — wide smile (E, S, Z)
+  //   O       — rounded oval (O, U, W)
+  //   smile   — upturned corners (happy emphasis, end of phrase)
+  const VISEMES = ['rest', 'closed', 'small', 'medium', 'wide', 'O', 'smile'];
+
+  // SVG path for each viseme — drawn in viewBox "0 0 100 40"
+  // These are lip outlines with an inner mouth opening.
+  const VISEME_PATHS = {
+    rest:    'M20,20 Q50,18 80,20 Q50,22 20,20 Z',
+    closed:  'M22,21 Q50,19 78,21 Q50,23 22,21 Z',
+    small:   'M25,17 Q50,14 75,17 Q50,26 25,17 Z',
+    medium:  'M23,14 Q50,10 77,14 Q50,30 23,14 Z',
+    wide:    'M18,18 Q50,12 82,18 Q50,24 18,18 Z',
+    O:       'M38,12 Q50,10 62,12 Q66,20 62,28 Q50,30 38,28 Q34,20 38,12 Z',
+    smile:   'M18,16 Q50,12 82,16 Q50,28 18,16 Z'
+  };
+
+  // Inner mouth (dark cavity) path — only visible when mouth is open
+  const VISEME_INNER = {
+    rest:    'M20,20 Q50,20 80,20 Z',
+    closed:  'M22,21 Q50,21 78,21 Z',
+    small:   'M28,18 Q50,16 72,18 Q50,23 28,18 Z',
+    medium:  'M26,15 Q50,12 74,15 Q50,27 26,15 Z',
+    wide:    'M22,18 Q50,14 78,18 Q50,22 22,18 Z',
+    O:       'M40,14 Q50,13 60,14 Q63,20 60,26 Q50,27 40,26 Q37,20 40,14 Z',
+    smile:   'M22,17 Q50,14 78,17 Q50,25 22,17 Z'
+  };
+
+  // ---------- VOICE MANAGER (Indian English, slowed) ----------
   const Voice = {
     synth: null,
     voice: null,
@@ -73,13 +99,15 @@
       const pick = () => {
         const voices = this.synth.getVoices();
         if (!voices.length) return;
+        // Strong preference order for Indian English female voices
         const prefs = [
-          v => v.lang === 'en-IN' && /female|priya|isha|kalpana|raveena|heera|veena/i.test(v.name),
+          v => v.lang === 'en-IN' && /female|priya|isha|kalpana|raveena|heera|veena|isha/i.test(v.name),
           v => v.lang === 'en-IN',
-          v => /female|raveena|samantha|victoria|karen|tessa|fiona|moira|aria|jenny/i.test(v.name),
-          v => v.lang === 'en-GB' && /female/i.test(v.name),
-          v => v.lang === 'en-US' && /female/i.test(v.name),
-          v => v.lang.startsWith('en')
+          v => /raveena|priya|isha|kalpana|heera|veena/i.test(v.name),
+          v => v.lang === 'en-GB' && /female|libby|serena|mia|sonia/i.test(v.name),
+          v => v.lang === 'en-US' && /female|aria|jenny|michelle|zira/i.test(v.name),
+          v => /female/i.test(v.name) && v.lang && v.lang.startsWith('en'),
+          v => v.lang && v.lang.startsWith('en')
         ];
         for (const pref of prefs) {
           const match = voices.find(pref);
@@ -96,22 +124,36 @@
         return;
       }
       this.synth.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      if (this.voice) u.voice = this.voice;
-      u.rate = opts.rate || 1.0;
-      u.pitch = opts.pitch || 1.05;
-      u.volume = opts.volume ?? 1.0;
-      u.onstart = () => { Human.lipSyncStart(opts); };
-      u.onend = () => { Human.lipSyncStop(); };
-      u.onerror = () => { Human.lipSyncStop(); };
-      // onboundary fires on each word — drive a different viseme per word
-      // so the mouth motion matches the rhythm of speech.
-      u.onboundary = (ev) => {
-        if (ev.name === 'word' || ev.name === undefined) {
-          Human.nextViseme(ev.charIndex);
+      // Split text into sentence chunks and speak with pauses for
+      // a more natural, slower Indian-English delivery.
+      const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+      let charOffset = 0;
+      sentences.forEach((sentence, idx) => {
+        const u = new SpeechSynthesisUtterance(sentence.trim());
+        if (this.voice) u.voice = this.voice;
+        // Slow, clear Indian-English pace: rate 0.85 (down from 1.0)
+        // Slightly lower pitch for warm, mature female tone
+        u.rate   = opts.rate   != null ? opts.rate   : 0.85;
+        u.pitch  = opts.pitch  != null ? opts.pitch  : 0.98;
+        u.volume = opts.volume != null ? opts.volume : 1.0;
+
+        const myCharOffset = charOffset;
+        if (idx === 0) {
+          u.onstart = () => { Human.lipSyncStart(opts); };
         }
-      };
-      this.synth.speak(u);
+        u.onend = () => {
+          if (idx === sentences.length - 1) Human.lipSyncStop();
+        };
+        u.onerror = () => { if (idx === sentences.length - 1) Human.lipSyncStop(); };
+        u.onboundary = (ev) => {
+          if (ev.name === 'word' || ev.name === undefined) {
+            Human.nextViseme(myCharOffset + (ev.charIndex || 0), sentence);
+          }
+        };
+        charOffset += sentence.length;
+        // Small gap between sentences for natural pacing
+        setTimeout(() => this.synth.speak(u), idx * 80);
+      });
     },
     cancel() {
       if (this.synth) this.synth.cancel();
@@ -124,79 +166,79 @@
     }
   };
 
-  // ---------- EMOTIVE DIALOGUE ENGINE ----------
+  // ---------- EMOTIVE DIALOGUE ENGINE (slowed for Indian English) ----------
   const Dialogue = {
     lines: {
       welcome: [
-        { t: "Welcome to A26, where six houses wait for your luck. Place your bets.", e: 'happy', p: 1.05, r: 0.98 },
-        { t: "Good evening, player. The cards are warm tonight. Choose your house.", e: 'happy', p: 1.08, r: 1.0 },
-        { t: "Hello! I am Priya, your digital dealer. Shall we begin?", e: 'happy', p: 1.06, r: 1.0 },
-        { t: "Six houses, three cards, and one chance to win big. Ready?", e: 'playful', p: 1.1, r: 1.02 }
+        { t: "Welcome to A26. Six houses are waiting for your luck. Please place your bets.", e: 'happy', p: 0.98, r: 0.82 },
+        { t: "Good evening, player. The cards are warm tonight. Choose your house.", e: 'happy', p: 1.0, r: 0.84 },
+        { t: "Hello. I am Priya, your digital dealer. Shall we begin?", e: 'happy', p: 0.98, r: 0.85 },
+        { t: "Six houses, three cards, and one chance to win big. Are you ready?", e: 'playful', p: 1.0, r: 0.84 }
       ],
       betPlaced: [
-        { t: "Bet placed. You can bet on more houses, or deal when ready.", e: 'happy', p: 1.0, r: 1.0 },
-        { t: "Lovely choice. The felt is yours.", e: 'happy', p: 1.06, r: 1.0 },
-        { t: "Good. I can feel your confidence from here.", e: 'playful', p: 1.08, r: 1.0 },
-        { t: "Noted. Your stake is locked in.", e: 'neutral', p: 1.0, r: 1.0 }
+        { t: "Bet placed. You can bet on more houses, or deal when ready.", e: 'happy', p: 0.98, r: 0.85 },
+        { t: "Lovely choice. The felt is yours.", e: 'happy', p: 1.0, r: 0.85 },
+        { t: "Good. I can feel your confidence from here.", e: 'playful', p: 1.0, r: 0.85 },
+        { t: "Noted. Your stake is locked in.", e: 'neutral', p: 0.96, r: 0.84 }
       ],
       betClosed: [
-        { t: "Bets are closing in three seconds. Final wagers only.", e: 'serious', p: 0.98, r: 0.98 },
-        { t: "Last call, player. The deck is hungry.", e: 'playful', p: 1.05, r: 1.0 }
+        { t: "Bets are closing in three seconds. Final wagers only.", e: 'serious', p: 0.95, r: 0.82 },
+        { t: "Last call, player. The deck is hungry.", e: 'playful', p: 0.98, r: 0.84 }
       ],
       shuffling: [
-        { t: "Shuffling the deck. Listen carefully — that's the sound of fortune.", e: 'neutral', p: 1.0, r: 0.95 },
-        { t: "Fifty-two cards, perfectly mixed. No favourites here.", e: 'playful', p: 1.05, r: 1.0 },
-        { t: "The shuffle begins. Lady luck has her eyes on someone tonight.", e: 'happy', p: 1.06, r: 0.98 }
+        { t: "Shuffling the deck. Listen carefully, that is the sound of fortune.", e: 'neutral', p: 0.98, r: 0.82 },
+        { t: "Fifty-two cards, perfectly mixed. No favourites here.", e: 'playful', p: 1.0, r: 0.84 },
+        { t: "The shuffle begins. Lady luck has her eyes on someone tonight.", e: 'happy', p: 1.0, r: 0.83 }
       ],
       cutDeck: [
-        { t: "A player cuts the deck. The cut is sacred.", e: 'serious', p: 0.98, r: 0.95 },
-        { t: "Cut the cards. May the cut favour the bold.", e: 'happy', p: 1.04, r: 1.0 },
-        { t: "And the cut is made. No more peeking now.", e: 'playful', p: 1.06, r: 1.0 }
+        { t: "A player cuts the deck. The cut is sacred.", e: 'serious', p: 0.95, r: 0.82 },
+        { t: "Cut the cards. May the cut favour the bold.", e: 'happy', p: 0.98, r: 0.84 },
+        { t: "And the cut is made. No more peeking now.", e: 'playful', p: 1.0, r: 0.84 }
       ],
       drawing: [
-        { t: "Drawing three cards. Watch closely.", e: 'serious', p: 1.0, r: 0.98 },
-        { t: "One... two... three. Let's see what fate has dealt.", e: 'happy', p: 1.05, r: 0.95 },
-        { t: "Here they come. The moment of truth.", e: 'happy', p: 1.06, r: 1.0 }
+        { t: "Drawing three cards. Watch closely.", e: 'serious', p: 0.96, r: 0.82 },
+        { t: "One, two, three. Let us see what fate has dealt.", e: 'happy', p: 1.0, r: 0.82 },
+        { t: "Here they come. The moment of truth.", e: 'happy', p: 1.0, r: 0.84 }
       ],
       card1: [
-        { t: "First card revealed.", e: 'neutral', p: 1.0, r: 1.0 },
-        { t: "And the first card is out.", e: 'neutral', p: 1.0, r: 1.0 },
-        { t: "Card one. Two more to go.", e: 'neutral', p: 1.02, r: 1.0 }
+        { t: "First card revealed.", e: 'neutral', p: 0.98, r: 0.84 },
+        { t: "And the first card is out.", e: 'neutral', p: 0.98, r: 0.84 },
+        { t: "Card one. Two more to go.", e: 'neutral', p: 1.0, r: 0.84 }
       ],
       card2: [
-        { t: "Second card on the table.", e: 'neutral', p: 1.0, r: 1.0 },
-        { t: "There goes the second.", e: 'neutral', p: 1.0, r: 1.0 },
-        { t: "Halfway through. One more card.", e: 'playful', p: 1.04, r: 1.0 }
+        { t: "Second card on the table.", e: 'neutral', p: 0.98, r: 0.84 },
+        { t: "There goes the second.", e: 'neutral', p: 0.98, r: 0.84 },
+        { t: "Halfway through. One more card.", e: 'playful', p: 1.0, r: 0.84 }
       ],
       card3: [
-        { t: "And the final card.", e: 'serious', p: 0.98, r: 0.95 },
-        { t: "The last card. Hold your breath.", e: 'serious', p: 1.0, r: 0.95 },
-        { t: "Three cards, three destinies.", e: 'happy', p: 1.05, r: 0.98 }
+        { t: "And the final card.", e: 'serious', p: 0.95, r: 0.82 },
+        { t: "The last card. Hold your breath.", e: 'serious', p: 0.96, r: 0.82 },
+        { t: "Three cards, three destinies.", e: 'happy', p: 1.0, r: 0.83 }
       ],
       win1: [
-        { t: "One match! You win at one to one. Well played.", e: 'happy', p: 1.12, r: 1.0 },
-        { t: "A single match pays you back double. Congratulations!", e: 'happy', p: 1.1, r: 1.0 },
-        { t: "One match, one reward. The deck was kind tonight.", e: 'happy', p: 1.08, r: 1.0 }
+        { t: "One match. You win at one to one. Well played.", e: 'happy', p: 1.05, r: 0.85 },
+        { t: "A single match pays you back double. Congratulations.", e: 'happy', p: 1.04, r: 0.85 },
+        { t: "One match, one reward. The deck was kind tonight.", e: 'happy', p: 1.02, r: 0.85 }
       ],
       win2: [
-        { t: "Two matches! One to two — that's a handsome payout!", e: 'excited', p: 1.18, r: 1.05 },
-        { t: "Two matches! Lady luck is smiling at you!", e: 'excited', p: 1.16, r: 1.05 },
-        { t: "Double match, double the joy. Beautiful play!", e: 'excited', p: 1.15, r: 1.0 }
+        { t: "Two matches. One to two, that is a handsome payout.", e: 'excited', p: 1.08, r: 0.86 },
+        { t: "Two matches. Lady luck is smiling at you.", e: 'excited', p: 1.06, r: 0.86 },
+        { t: "Double match, double the joy. Beautiful play.", e: 'excited', p: 1.06, r: 0.85 }
       ],
       win3: [
-        { t: "Three matches! One to four! You've hit the jackpot!", e: 'ecstatic', p: 1.25, r: 1.1 },
-        { t: "Three of a kind! Incredible! One to four is yours!", e: 'ecstatic', p: 1.22, r: 1.08 },
-        { t: "A perfect triple! The deck has crowned you tonight!", e: 'ecstatic', p: 1.2, r: 1.05 }
+        { t: "Three matches. One to four. You have hit the jackpot.", e: 'ecstatic', p: 1.12, r: 0.88 },
+        { t: "Three of a kind. Incredible. One to four is yours.", e: 'ecstatic', p: 1.1, r: 0.87 },
+        { t: "A perfect triple. The deck has crowned you tonight.", e: 'ecstatic', p: 1.08, r: 0.86 }
       ],
       lose: [
-        { t: "No matches this round. The cards were shy. Try again?", e: 'sad', p: 0.96, r: 0.95 },
-        { t: "Better luck next round. The deck owes you one.", e: 'sad', p: 0.97, r: 0.96 },
-        { t: "Not your round. Stay sharp — the next shuffle is fresh.", e: 'neutral', p: 0.98, r: 0.98 }
+        { t: "No matches this round. The cards were shy. Try again?", e: 'sad', p: 0.92, r: 0.82 },
+        { t: "Better luck next round. The deck owes you one.", e: 'sad', p: 0.93, r: 0.83 },
+        { t: "Not your round. Stay sharp, the next shuffle is fresh.", e: 'neutral', p: 0.95, r: 0.83 }
       ],
       idle: [
-        { t: "Take your time. The cards will wait.", e: 'neutral', p: 1.0, r: 0.98 },
-        { t: "Six houses. Six chances. Where will you place your trust?", e: 'playful', p: 1.05, r: 1.0 },
-        { t: "I'm here when you're ready.", e: 'happy', p: 1.03, r: 1.0 }
+        { t: "Take your time. The cards will wait.", e: 'neutral', p: 0.98, r: 0.83 },
+        { t: "Six houses. Six chances. Where will you place your trust?", e: 'playful', p: 1.0, r: 0.84 },
+        { t: "I am here when you are ready.", e: 'happy', p: 0.98, r: 0.84 }
       ]
     },
     pick(key) {
@@ -210,7 +252,7 @@
       Voice.speak(line.t, { pitch: line.p, rate: line.r });
       return line;
     },
-    sayCustom(text, emotion = 'neutral', pitch = 1.0, rate = 1.0) {
+    sayCustom(text, emotion = 'neutral', pitch = 0.98, rate = 0.85) {
       Human.setEmotion(emotion);
       Human.setBubble(text);
       Voice.speak(text, { pitch, rate });
@@ -221,79 +263,97 @@
   const Human = {
     root: null,
     layers: {},          // pose image layers
-    mouthLayers: {},     // mouth viseme image layers (flip-book)
     emotionLayers: {},   // emotion face image layers (crossfade overlay)
     currentPose: 'idle',
     currentEmotion: 'neutral',
     lipSyncTimer: null,
     visemeIndex: 0,
+    currentViseme: 'rest',
     breatheTimer: null,
     swayTimer: null,
     initialized: false,
-    framesLoaded: { mouth: false, emotion: false },
+    framesLoaded: { emotion: false },
+    parts: {},
 
-    // ---------- DOM TEMPLATE ----------
-    template: `
-<div class="dh-stage" id="dhStage">
-  <div class="dh-spotlight"></div>
-  <div class="dh-image-wrap" id="dhImageWrap">
-    <!-- Layer 1: Pose images (idle/shuffling/cutting/dealing/win/lose) -->
-    <img class="dh-img" data-pose="idle"         src="/images/dealers/real_idle.png"         alt="Priya idle">
-    <img class="dh-img" data-pose="shuffling"    src="/images/dealers/real_shuffling.png"    alt="Priya shuffling">
-    <img class="dh-img" data-pose="cutting"      src="/images/dealers/real_cutting.png"      alt="Priya cutting">
-    <img class="dh-img" data-pose="dealing"      src="/images/dealers/real_dealing.png"      alt="Priya dealing">
-    <img class="dh-img" data-pose="reveal-win"   src="/images/dealers/real_reveal_win.png"   alt="Priya win">
-    <img class="dh-img" data-pose="reveal-lose"  src="/images/dealers/real_reveal_lose.png"  alt="Priya lose">
-
-    <!-- Layer 2: Emotion face variants (crossfade over pose on emotion change) -->
-    <img class="dh-emotion-img" data-emotion="happy"     src="/images/dealers/real_emotion_happy.png"     alt="">
-    <img class="dh-emotion-img" data-emotion="surprised" src="/images/dealers/real_emotion_surprised.png" alt="">
-    <img class="dh-emotion-img" data-emotion="thinking"  src="/images/dealers/real_emotion_thinking.png"  alt="">
-    <img class="dh-emotion-img" data-emotion="sad"       src="/images/dealers/real_emotion_sad.png"       alt="">
-
-    <!-- Layer 3: Mouth viseme frames (flip-book during speech) -->
-    <img class="dh-mouth-img" data-viseme="closed" src="/images/dealers/real_mouth_smile.png" alt="">
-    <img class="dh-mouth-img" data-viseme="small"  src="/images/dealers/real_mouth_small.png"  alt="">
-    <img class="dh-mouth-img" data-viseme="medium" src="/images/dealers/real_mouth_medium.png" alt="">
-    <img class="dh-mouth-img" data-viseme="wide"   src="/images/dealers/real_mouth_wide.png"   alt="">
-    <img class="dh-mouth-img" data-viseme="O"      src="/images/dealers/real_mouth_O.png"      alt="">
-
-    <!-- Fallback CSS mouth overlay (visible only if mouth frames fail to load) -->
-    <div class="dh-mouth" id="dhMouth">
-      <div class="dh-mouth-inner" id="dhMouthInner"></div>
-      <div class="dh-teeth" id="dhTeeth"></div>
-    </div>
-
-    <!-- Eye overlays: thin neutral-toned bands that flash across the eyes to
-         simulate blinking. -->
-    <div class="dh-eye-lid dh-eye-left" id="dhEyeLeft"></div>
-    <div class="dh-eye-lid dh-eye-right" id="dhEyeRight"></div>
-    <div class="dh-eye-glint dh-eye-glint-left" id="dhGlintLeft"></div>
-    <div class="dh-eye-glint dh-eye-glint-right" id="dhGlintRight"></div>
-
-    <div class="dh-vignette"></div>
-    <div class="dh-pulse-ring" id="dhPulseRing"></div>
-  </div>
-  <div class="dh-bubble" id="dhBubble">
-    <div class="dh-bubble-text" id="dhBubbleText"></div>
-    <div class="dh-bubble-tail"></div>
-  </div>
-  <div class="dh-emotion-indicator" id="dhEmotion">neutral</div>
-  <div class="dh-voice-toggle" id="dhVoiceToggle" title="Toggle voice">
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-  </div>
-  <div class="dh-name-plate">Priya · AI Digital Dealer</div>
-</div>
-    `,
-
-    // ---------- INIT ----------
     init(containerId) {
       const container = document.getElementById(containerId);
-      if (!container) { console.error('Digital Human: container not found'); return; }
-      container.innerHTML = this.template;
+      if (!container) return;
       this.root = container;
+      container.innerHTML = `
+        <div class="dh-stage">
+          <div class="dh-vignette"></div>
+          <div class="dh-spotlight"></div>
 
-      // Cache pose image layers
+          <div class="dh-image-wrap" id="dhImageWrap">
+            <!-- Layer 1: Pose images (crossfaded) -->
+            ${Object.entries(POSES).map(([key, src]) =>
+              `<img class="dh-img ${key === 'idle' ? 'active' : ''}" data-pose="${key}" src="${src}" alt="">`
+            ).join('')}
+
+            <!-- Layer 2: Emotion face variants (crossfade overlay) -->
+            ${Object.entries(EMOTION_FACES).map(([key, src]) =>
+              `<img class="dh-emotion-img" data-emotion="${key}" src="${src}" alt="">`
+            ).join('')}
+
+            <!-- Layer 3: SVG MOUTH OVERLAY (precise viseme morphing) -->
+            <div class="dh-mouth-overlay" id="dhMouthOverlay">
+              <svg class="dh-mouth-svg" viewBox="0 0 100 40" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <linearGradient id="lipGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stop-color="#c8546a"/>
+                    <stop offset="50%" stop-color="#a83a52"/>
+                    <stop offset="100%" stop-color="#7a2540"/>
+                  </linearGradient>
+                  <linearGradient id="teethGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%"  stop-color="#fff8f0"/>
+                    <stop offset="100%" stop-color="#e8d8c8"/>
+                  </linearGradient>
+                </defs>
+                <!-- Inner mouth (dark cavity, visible when open) -->
+                <path class="dh-mouth-inner" id="dhMouthInnerPath"
+                      d="${VISEME_INNER.rest}" fill="#3a1018"/>
+                <!-- Teeth (visible when open enough) -->
+                <path class="dh-mouth-teeth" id="dhMouthTeethPath"
+                      d="${VISEME_INNER.rest}" fill="url(#teethGrad)" opacity="0"/>
+                <!-- Outer lips -->
+                <path class="dh-mouth-outer" id="dhMouthOuterPath"
+                      d="${VISEME_PATHS.rest}" fill="url(#lipGrad)" stroke="#5a1830" stroke-width="0.5"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Eye blink overlays (subtle) -->
+          <div class="dh-eye dh-eye-left" id="dhEyeLeft"></div>
+          <div class="dh-eye dh-eye-right" id="dhEyeRight"></div>
+          <div class="dh-glint dh-glint-left" id="dhGlintLeft"></div>
+          <div class="dh-glint dh-glint-right" id="dhGlintRight"></div>
+
+          <!-- Speaking pulse ring -->
+          <div class="dh-pulse-ring" id="dhPulseRing"></div>
+
+          <!-- Emotion indicator (debug) -->
+          <div class="dh-emotion-indicator" id="dhEmotion">neutral</div>
+
+          <!-- Speech bubble -->
+          <div class="dh-bubble" id="dhBubble">
+            <span id="dhBubbleText"></span>
+          </div>
+
+          <!-- Name plate -->
+          <div class="dh-name-plate">
+            <span class="dh-name">PRIYA</span>
+            <span class="dh-role">Your Dealer</span>
+          </div>
+
+          <!-- Voice toggle -->
+          <button class="dh-voice-toggle" id="dhVoiceToggle" aria-label="Toggle voice">
+            <span class="dh-voice-on">🔊</span>
+            <span class="dh-voice-off">🔇</span>
+          </button>
+        </div>
+      `;
+
+      // Cache pose layers
       this.layers = {};
       this.root.querySelectorAll('.dh-img').forEach(img => {
         this.layers[img.dataset.pose] = img;
@@ -303,33 +363,16 @@
       this.emotionLayers = {};
       this.root.querySelectorAll('.dh-emotion-img').forEach(img => {
         this.emotionLayers[img.dataset.emotion] = img;
-        // Detect load success to enable emotion crossfade
         img.addEventListener('load',  () => { this.framesLoaded.emotion = true; });
-        img.addEventListener('error', () => { img.dataset.failed = '1'; });
-      });
-
-      // Cache mouth viseme layers
-      this.mouthLayers = {};
-      let mouthLoadedCount = 0;
-      this.root.querySelectorAll('.dh-mouth-img').forEach(img => {
-        this.mouthLayers[img.dataset.viseme] = img;
-        img.addEventListener('load', () => {
-          mouthLoadedCount++;
-          if (mouthLoadedCount >= 4) {
-            this.framesLoaded.mouth = true;
-            // Hide the CSS fallback mouth once real frames are ready
-            const fb = document.getElementById('dhMouth');
-            if (fb) fb.style.display = 'none';
-          }
-        });
         img.addEventListener('error', () => { img.dataset.failed = '1'; });
       });
 
       // Cache face overlays
       this.parts = {
-        mouth: document.getElementById('dhMouth'),
-        mouthInner: document.getElementById('dhMouthInner'),
-        teeth: document.getElementById('dhTeeth'),
+        mouthOverlay: document.getElementById('dhMouthOverlay'),
+        mouthOuter: document.getElementById('dhMouthOuterPath'),
+        mouthInner: document.getElementById('dhMouthInnerPath'),
+        mouthTeeth: document.getElementById('dhMouthTeethPath'),
         eyeLeft: document.getElementById('dhEyeLeft'),
         eyeRight: document.getElementById('dhEyeRight'),
         glintLeft: document.getElementById('dhGlintLeft'),
@@ -351,7 +394,6 @@
       // Preload all poses
       Object.values(this.layers).forEach(img => {
         img.style.opacity = '0';
-        const _ = img.complete;
       });
       this.layers[this.currentPose].style.opacity = '1';
     },
@@ -376,9 +418,6 @@
     },
 
     // ---------- EMOTIONS ----------
-    // Each emotion applies: (a) CSS filter on the photo, (b) gesture class
-    // on the image-wrap, (c) colour of the pulse ring, (d) crossfade to
-    // an emotion-specific face variant if available.
     setEmotion(emotion) {
       this.currentEmotion = emotion;
       const e = document.getElementById('dhEmotion');
@@ -454,111 +493,117 @@
       setTimeout(blink, 1500);
     },
 
-    // ---------- LIP-SYNC (real mouth movement) ----------
+    // ---------- LIP-SYNC (SVG mouth morphing — accurate, smooth) ----------
     // Two layers of motion:
     //   1. Word-synced viseme changes (driven by Voice.speak onboundary)
-    //   2. Continuous micro-motion fallback timer (in case onboundary
-    //      doesn't fire — some browsers/voices don't emit boundary events)
+    //      — each word boundary triggers a viseme based on the word's first
+    //        letter, producing natural lip motion that matches speech rhythm.
+    //   2. Continuous fallback timer (160ms) cycles through a natural
+    //      viseme pattern when boundary events don't fire (some browsers
+    //      don't emit them). This guarantees the mouth always moves during speech.
     lipSyncStart(opts) {
       const ring = this.parts.pulseRing;
       if (ring) ring.classList.add('speaking');
-      const fbMouth = this.parts.mouth;
-      if (fbMouth) fbMouth.classList.add('speaking');
+      const wrap = this.parts.imageWrap;
+      if (wrap) wrap.classList.add('speaking');
       this.visemeIndex = 0;
+      this.currentViseme = 'rest';
 
-      // Start the continuous fallback viseme cycle
+      // Start the continuous fallback viseme cycle (slower, more natural)
       this.lipSyncTimer = setInterval(() => {
         if (!this.initialized) return;
         this._cycleViseme();
-      }, 120);
+      }, 160);
 
-      // If we have real mouth frames, immediately show first viseme
-      if (this.framesLoaded.mouth) {
-        this._showViseme('small');
-      }
+      // Open the mouth slightly at speech start
+      this._setViseme('small');
     },
 
     // Called per word boundary (from Voice.speak) — picks a viseme based
     // on the word's first letter to make the mouth motion look natural.
-    nextViseme(charIndex) {
-      if (!this.framesLoaded.mouth) return;
-      // Pick a viseme pseudo-randomly but weighted by character to create
-      // natural variation. Realistic talking alternates between open/closed
-      // shapes rather than random noise.
-      const seed = (charIndex || 0) % 7;
-      const visemeOrder = ['small', 'medium', 'O', 'closed', 'wide', 'medium', 'small'];
-      this._showViseme(visemeOrder[seed]);
+    nextViseme(charIndex, sentence) {
+      // Map first letter of the current word to a viseme.
+      // This produces phoneme-like variation that looks like real talking.
+      const text = (sentence || '').toLowerCase();
+      const i = charIndex || 0;
+      let ch = text[i];
+      // Skip non-letters
+      let k = i;
+      while (k < text.length && !/[a-z]/.test(text[k])) k++;
+      ch = text[k] || 'a';
+
+      // Phoneme-to-viseme mapping (simplified Preston-Blair)
+      let viseme;
+      if ('mpb'.includes(ch))         viseme = 'closed';
+      else if ('oquvw'.includes(ch))  viseme = 'O';
+      else if ('aei'.includes(ch))    viseme = 'medium';
+      else if ('szrnltcdgkh'.includes(ch)) viseme = 'wide';
+      else if ('y'.includes(ch))      viseme = 'small';
+      else if ('f'.includes(ch))      viseme = 'small';
+      else                              viseme = 'medium';
+
+      this._setViseme(viseme);
+      // Track for the fallback cycle so it doesn't fight the word boundary
+      this.visemeIndex++;
     },
 
     // Internal: cycle to next viseme (fallback timer)
     _cycleViseme() {
-      if (!this.framesLoaded.mouth) {
-        // No real frames — drive the CSS fallback mouth instead
-        this._mouthFrameFallback(this.visemeIndex);
-        this.visemeIndex++;
-        return;
-      }
-      // Real frames: cycle through 5 visemes for natural rhythm
-      // Pattern: closed → small → medium → small → O → small → closed → wide → ...
-      // This simulates natural talking where the mouth returns to closed
-      // between syllables.
-      const cycle = ['closed', 'small', 'medium', 'small', 'O', 'small', 'closed', 'wide', 'small', 'medium'];
+      // Natural talking pattern: rest → small → medium → small → O → small → rest → wide → ...
+      // Returns to rest between syllables for realistic rhythm.
+      const cycle = ['rest', 'small', 'medium', 'small', 'O', 'small', 'rest', 'wide', 'small', 'medium', 'rest', 'small'];
       const v = cycle[this.visemeIndex % cycle.length];
-      this._showViseme(v);
+      this._setViseme(v);
       this.visemeIndex++;
     },
 
-    _showViseme(visemeKey) {
-      Object.entries(this.mouthLayers).forEach(([key, img]) => {
-        if (img.dataset.failed === '1') return;
-        img.classList.toggle('active', key === visemeKey);
-      });
-    },
+    // Internal: apply a viseme by morphing the SVG mouth path
+    _setViseme(visemeKey) {
+      if (!VISEME_PATHS[visemeKey]) visemeKey = 'rest';
+      if (this.currentViseme === visemeKey) return;
+      this.currentViseme = visemeKey;
 
-    // CSS fallback mouth (only used if real frames fail to load)
-    _mouthFrameFallback(frame) {
-      const mouth = this.parts.mouth;
+      const outer = this.parts.mouthOuter;
       const inner = this.parts.mouthInner;
-      const teeth = this.parts.teeth;
-      if (!mouth) return;
-      const shapes = [
-        { h: 4,  op: 0.0, teeth: 0 },
-        { h: 8,  op: 0.4, teeth: 0.4 },
-        { h: 14, op: 0.7, teeth: 0.7 },
-        { h: 20, op: 1.0, teeth: 1.0 }
-      ];
-      const s = shapes[frame % shapes.length];
-      mouth.style.setProperty('--mouth-h', s.h + 'px');
-      mouth.style.setProperty('--mouth-op', s.op);
-      if (inner) inner.style.opacity = s.op * 0.85;
-      if (teeth) teeth.style.opacity = s.teeth * 0.5;
+      const teeth = this.parts.mouthTeeth;
+      if (!outer || !inner) return;
+
+      // Morph the SVG paths (CSS transition on the path handles smoothness)
+      outer.setAttribute('d', VISEME_PATHS[visemeKey]);
+      inner.setAttribute('d', VISEME_INNER[visemeKey]);
+
+      // Show teeth when mouth is open enough
+      const openVisemes = ['medium', 'wide', 'O', 'smile'];
+      if (teeth) {
+        teeth.setAttribute('d', VISEME_INNER[visemeKey]);
+        teeth.style.opacity = openVisemes.includes(visemeKey) ? '0.85' : '0';
+      }
+
+      // Jaw-drop micro-transform on the overlay for 3D feel
+      const overlay = this.parts.mouthOverlay;
+      if (overlay) {
+        const dropMap = { rest: 0, closed: 0, small: 1, medium: 2, wide: 1, O: 3, smile: 0 };
+        overlay.style.setProperty('--jaw-drop', (dropMap[visemeKey] || 0) + 'px');
+      }
     },
 
     lipSyncStop() {
       if (this.lipSyncTimer) { clearInterval(this.lipSyncTimer); this.lipSyncTimer = null; }
       const ring = this.parts.pulseRing;
-      const fbMouth = this.parts.mouth;
       if (ring) ring.classList.remove('speaking');
-      if (fbMouth) {
-        fbMouth.classList.remove('speaking');
-        fbMouth.style.setProperty('--mouth-h', '2px');
-        fbMouth.style.setProperty('--mouth-op', '0');
-      }
-      // Hide all mouth viseme frames
-      Object.values(this.mouthLayers).forEach(img => {
-        if (img.dataset.failed === '1') return;
-        img.classList.remove('active');
-      });
-      if (this.parts.mouthInner) this.parts.mouthInner.style.opacity = '0';
-      if (this.parts.teeth) this.parts.teeth.style.opacity = '0';
+      const wrap = this.parts.imageWrap;
+      if (wrap) wrap.classList.remove('speaking');
+      // Return mouth to rest position
+      this._setViseme('rest');
     },
 
     lipSync(text, opts = {}) {
       // Fallback when voice disabled — simulate duration from text length.
-      const duration = Math.max(800, text.length * 60);
+      // Slower duration to match the new Indian-English pace.
+      const duration = Math.max(1200, text.length * 75);
       this.lipSyncStart(opts);
       let frame = 0;
-      const t = setInterval(() => this._cycleViseme(), 150);
+      const t = setInterval(() => this._cycleViseme(), 180);
       setTimeout(() => { clearInterval(t); this.lipSyncStop(); }, duration);
     },
 
