@@ -8,75 +8,120 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="A26 Game">
 <meta name="description" content="A26 - Live Card Game with AI virtual dealer">
-<title>A26 - Login</title>
+<title>A26 · Live Card Game</title>
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" type="image/png" href="/icons/icon-256.png">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="/images/a26-logo.svg">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=dh14">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cormorant+Garamond:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/style.css?v=dh15">
 </head>
 <body class="auth-page">
-<div class="auth-container">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <img src="/images/a26-logo.svg" alt="A26" class="auth-logo-img">
-      <p class="subtitle">Live Card Game · AI Digital Dealer</p>
+<div class="auth-shell">
+
+  <!-- LEFT: Visual / brand panel -->
+  <aside class="auth-visual">
+    <div class="auth-visual-bg"></div>
+    <div class="auth-visual-overlay"></div>
+    <div class="auth-visual-content">
+      <div class="auth-visual-mark">
+        <img src="/images/a26-logo.svg" alt="A26" class="auth-visual-logo">
+      </div>
+      <div class="auth-visual-tagline">
+        <span class="ornament"><span></span></span>
+        <h1 class="auth-visual-title">A&nbsp;Twenty&nbsp;Six</h1>
+        <p class="auth-visual-sub">Live Card Game · AI Digital Dealer</p>
+        <span class="ornament reverse"><span></span></span>
+      </div>
+      <ul class="auth-visual-points">
+        <li><span class="dot"></span> Six houses · live draws · real-time results</li>
+        <li><span class="dot"></span> Play instantly as a guest with unlimited chips</li>
+        <li><span class="dot"></span> Register a free account to bet for real</li>
+      </ul>
+    </div>
+    <div class="auth-visual-footer">
+      <span>Monte&nbsp;Carlo · Las&nbsp;Vegas · Macau</span>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Form panel -->
+  <main class="auth-form-panel">
+    <div class="auth-mobile-banner" aria-hidden="true">
+      <div class="auth-mobile-banner-bg"></div>
+      <img src="/images/a26-logo.svg" alt="A26" class="auth-mobile-logo">
     </div>
 
-    <div class="auth-tabs">
-      <button class="auth-tab active" data-tab="login">Login</button>
-      <button class="auth-tab" data-tab="register">Register</button>
+    <div class="auth-container">
+      <div class="auth-card">
+        <div class="auth-card-header">
+          <span class="auth-eyebrow">Welcome back to the table</span>
+          <h2 class="auth-card-title">Sign in to A26</h2>
+          <p class="auth-card-lede">Place your bets, watch the dealer, win the round.</p>
+        </div>
+
+        <div class="auth-tabs">
+          <button class="auth-tab active" data-tab="login">Login</button>
+          <button class="auth-tab" data-tab="register">Register</button>
+        </div>
+
+        <!-- LOGIN FORM -->
+        <form id="loginForm" class="auth-form active">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="loginUsername" required autocomplete="username" placeholder="Enter username">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="Enter password">
+          </div>
+          <div class="form-error" id="loginError"></div>
+          <button type="submit" class="btn btn-primary btn-full">Login</button>
+        </form>
+
+        <!-- REGISTER FORM -->
+        <form id="registerForm" class="auth-form">
+          <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="regUsername" required placeholder="Choose a username" minlength="3">
+          </div>
+          <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="regPassword" required placeholder="Create password" minlength="6">
+          </div>
+          <div class="form-group">
+            <label>Confirm Password</label>
+            <input type="password" id="regConfirm" required placeholder="Confirm password">
+          </div>
+          <div class="form-group">
+            <label>Phone (optional)</label>
+            <input type="tel" id="regPhone" placeholder="Phone number">
+          </div>
+          <div class="form-group">
+            <label>Email (optional)</label>
+            <input type="email" id="regEmail" placeholder="Email address">
+          </div>
+          <div class="form-error" id="regError"></div>
+          <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+        </form>
+
+        <div class="auth-divider"><span>or</span></div>
+
+        <a href="/index.html" class="guest-btn">
+          <span class="guest-btn-icon">♠</span>
+          <span class="guest-btn-text">
+            <strong>Play as Guest</strong>
+            <em>Unlimited demo chips · No registration</em>
+          </span>
+        </a>
+
+        <div class="auth-footer">
+          <p class="auth-footer-admin">Demo admin: <strong>admin</strong> / <strong>admin123</strong></p>
+          <p class="auth-footer-fine">Guests play with an unlimited demo balance to learn the game. Demo winnings are not real money. Register a free account to play for real.</p>
+        </div>
+      </div>
     </div>
+  </main>
 
-    <!-- LOGIN FORM -->
-    <form id="loginForm" class="auth-form active">
-      <div class="form-group">
-        <label>Username</label>
-        <input type="text" id="loginUsername" required autocomplete="username" placeholder="Enter username">
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="loginPassword" required autocomplete="current-password" placeholder="Enter password">
-      </div>
-      <div class="form-error" id="loginError"></div>
-      <button type="submit" class="btn btn-primary btn-full">Login</button>
-    </form>
-
-    <!-- REGISTER FORM -->
-    <form id="registerForm" class="auth-form">
-      <div class="form-group">
-        <label>Username</label>
-        <input type="text" id="regUsername" required placeholder="Choose a username" minlength="3">
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="regPassword" required placeholder="Create password" minlength="6">
-      </div>
-      <div class="form-group">
-        <label>Confirm Password</label>
-        <input type="password" id="regConfirm" required placeholder="Confirm password">
-      </div>
-      <div class="form-group">
-        <label>Phone (optional)</label>
-        <input type="tel" id="regPhone" placeholder="Phone number">
-      </div>
-      <div class="form-group">
-        <label>Email (optional)</label>
-        <input type="email" id="regEmail" placeholder="Email address">
-      </div>
-      <div class="form-error" id="regError"></div>
-      <button type="submit" class="btn btn-primary btn-full">Create Account</button>
-    </form>
-
-    <div class="auth-footer">
-      <p>Demo admin: <strong>admin</strong> / <strong>admin123</strong></p>
-      <hr style="border-color:rgba(212,168,67,0.25);margin:14px 0;">
-      <p style="font-size:0.78rem;color:#bbb;margin-bottom:8px;">Want to try the game first?</p>
-      <a href="/index.html" class="btn btn-full guest-btn">Play as Guest (₹50,000 demo)</a>
-      <p style="font-size:0.7rem;color:#888;margin-top:8px;">Guests get a ₹50,000 demo balance to learn the game. Demo winnings are not real money. Register a free account to play for real.</p>
-    </div>
-  </div>
 </div>
 
 <script src="/js/auth.js"></script>
