@@ -1711,8 +1711,13 @@ body::before {
   inherits: false;
 }
 
-/* === STACKED POSE IMAGES === */
+/* === STACKED POSE IMAGES (legacy — hidden in v8, single face used) === */
 .dh-img {
+  display: none !important;
+}
+
+/* === SINGLE FACE IMAGE (v8 — one consistent dealer face) === */
+.dh-face-img {
   position: absolute;
   bottom: 0;
   left: 50%;
@@ -1722,14 +1727,55 @@ body::before {
   max-width: 115%;
   object-fit: cover;
   object-position: center 18%;
-  opacity: 0;
-  transition: opacity 0.5s ease;
+  opacity: 1;
   pointer-events: none;
-  will-change: opacity;
+  will-change: transform, filter;
 }
 
-.dh-img.active {
-  opacity: 1;
+/* === POSE TRANSFORMS (applied to .dh-image-wrap via .pose-* classes) ===
+   The face image never changes — poses are CSS transforms that
+   tilt/scale/shift the same image to simulate dealer actions. */
+.dh-image-wrap.pose-idle {
+  --tilt: 0deg;
+  --nod: 0px;
+  --zoom: 1;
+}
+.dh-image-wrap.pose-shuffling {
+  animation: poseShuffle 1.2s ease-in-out;
+}
+.dh-image-wrap.pose-cutting {
+  --tilt: -2deg;
+  --nod: 5px;
+  --zoom: 1.01;
+}
+.dh-image-wrap.pose-dealing {
+  --tilt: 1deg;
+  --nod: -3px;
+  --zoom: 1.02;
+}
+.dh-image-wrap.pose-reveal-win {
+  --tilt: 0deg;
+  --nod: -5px;
+  --zoom: 1.03;
+  animation: poseWinPulse 0.8s ease-out;
+}
+.dh-image-wrap.pose-reveal-lose {
+  --tilt: -1deg;
+  --nod: 8px;
+  --zoom: 0.99;
+}
+
+@keyframes poseShuffle {
+  0%   { --tilt: 0deg; --nod: 0px; }
+  25%  { --tilt: 2deg; --nod: 3px; }
+  50%  { --tilt: -2deg; --nod: -2px; }
+  75%  { --tilt: 1deg; --nod: 4px; }
+  100% { --tilt: 0deg; --nod: 0px; }
+}
+@keyframes poseWinPulse {
+  0%   { --zoom: 1; }
+  50%  { --zoom: 1.05; }
+  100% { --zoom: 1.03; }
 }
 
 /* Vignette overlay for cinematic depth */
@@ -1887,24 +1933,9 @@ body::before {
 /* Photorealistic face variants that crossfade over the active pose
    when an emotion is set. They sit ABOVE the pose image but BELOW
    the mouth frames so mouth movement is still visible. */
+/* Legacy emotion face variant images — hidden in v8 (single face only) */
 .dh-emotion-img {
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  height: 100%;
-  width: auto;
-  max-width: 115%;
-  object-fit: cover;
-  object-position: center 18%;
-  opacity: 0;
-  transition: opacity 0.45s ease;
-  pointer-events: none;
-  will-change: opacity;
-  z-index: 2;
-}
-.dh-emotion-img.active {
-  opacity: 1;
+  display: none !important;
 }
 
 /* === SVG MOUTH OVERLAY (precise viseme morphing) === */

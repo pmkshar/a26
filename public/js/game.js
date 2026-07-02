@@ -36,6 +36,7 @@ let lastWin = 0;
 let videoClockInterval = null;
 let dhReady = false;
 let idleChatInterval = null;
+let hasSpokenBetPlaced = false;  // Only speak "bet placed" once per round
 
 // === INIT ===
 document.addEventListener('DOMContentLoaded', async () => {
@@ -72,14 +73,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   startBettingWindow();
 });
 
-// === IDLE CHATTER (LLM-style contextual banter) ===
+// === IDLE CHATTER (contextual banter — only when truly idle and silent) ===
 function startIdleChatter() {
   if (idleChatInterval) clearInterval(idleChatInterval);
   idleChatInterval = setInterval(() => {
-    if (isBettingOpen && !isDealing && dhReady) {
+    // Only chatter when: betting open, not dealing, not already speaking,
+    // and no bets placed yet (don't interrupt the player's thinking).
+    if (isBettingOpen && !isDealing && dhReady && !DigitalHuman.isSpeaking() && totalBet === 0) {
       DigitalHuman.say('idle');
     }
-  }, 18000); // every 18s when idle
+  }, 25000); // every 25s when truly idle
 }
 
 // === VIDEO CLOCK (decorative, runs always) ===
@@ -252,8 +255,11 @@ function placeBet(house, amount) {
   const houseEl = document.querySelector(`.house[data-house="${house}"]`);
   houseEl.classList.add('pulse');
   setTimeout(() => houseEl.classList.remove('pulse'), 400);
-  // Dealer acknowledges bet
-  if (dhReady) DigitalHuman.say('betPlaced');
+  // Dealer acknowledges bet — only on the FIRST bet of the round (avoid spam)
+  if (dhReady && !hasSpokenBetPlaced && !DigitalHuman.isSpeaking()) {
+    hasSpokenBetPlaced = true;
+    DigitalHuman.say('betPlaced');
+  }
 }
 
 // Render the active bets summary panel
@@ -328,6 +334,7 @@ function clearBets() {
   balance += totalBet;
   totalBet = 0;
   bets = {};
+  hasSpokenBetPlaced = false;  // Allow "bet placed" to speak again
   document.querySelectorAll('.house-bets').forEach(el => el.innerHTML = '');
   document.querySelectorAll('.house').forEach(el => el.classList.remove('selected', 'at-max', 'has-bet'));
   document.getElementById('selectedHouseDisplay').textContent = 'Select one or more houses';
@@ -360,6 +367,7 @@ function updateBalanceUI() {
 // === BETTING WINDOW TIMER ===
 function startBettingWindow() {
   isBettingOpen = true;
+  hasSpokenBetPlaced = false;  // Reset for the new round
   betWindowStart = Date.now();
   setDealerPose('idle');
   setDealerBubble('Place your bets');
@@ -370,9 +378,9 @@ function startBettingWindow() {
     const elapsed = Date.now() - betWindowStart;
     const remaining = Math.max(0, Math.ceil((BET_WINDOW_MS - elapsed) / 1000));
     document.getElementById('betTimer').textContent = remaining;
-    // Bet-closing warning at 5s
-    if (remaining === 5 && dhReady && totalBet > 0) {
-      DigitalHuman.say('betClosed');
+    // Bet-closing warning at 5s (only if bets placed and not already speaking)
+    if (remaining === 5 && dhReady && totalBet > 0 && !DigitalHuman.isSpeaking()) {
+      DigitalHuman.say('betClosingSoon');
     }
     if (remaining <= 0) {
       clearInterval(betTimerInterval);
@@ -433,6 +441,10 @@ async function dealNow() {
 
   isDealing = true;
   stopBettingWindow();
+  // Stop idle chatter during dealing
+  if (idleChatInterval) { clearInterval(idleChatInterval); idleChatInterval = null; }
+  // Cancel any current speech before starting the deal narration
+  if (dhReady) DigitalHuman.cancelSpeech();
   document.getElementById('btnDeal').disabled = true;
   document.getElementById('btnClear').disabled = true;
 
@@ -446,30 +458,27 @@ async function dealNow() {
   document.getElementById('resultBanner').textContent = '';
   document.getElementById('resultBanner').className = 'result-banner';
 
-  // === ANIMATION SEQUENCE ===
-  // 1. Dealer shuffles the deck
-  if (dhReady) DigitalHuman.say('shuffling');
+  // === ANIMATION SEQUENCE (sequential narration — each line waits for the previous to finish) ===
+  // 1. Announce betting is closed, then shuffle
   setDealerPose('cutting');
   animateDeckShuffle();
-  await delay(1200);
+  if (dhReady) await DigitalHuman.sayAndWait('bettingClosed');
+  if (dhReady) await DigitalHuman.sayAndWait('shuffling');
 
   // 2. A player cuts the cards
-  if (dhReady) DigitalHuman.say('cutDeck');
-  await delay(1000);
+  if (dhReady) await DigitalHuman.sayAndWait('cutDeck');
 
   // 3. Build deck and draw 3 cards
-  if (dhReady) DigitalHuman.say('drawing');
   setDealerPose('dealing');
-  await delay(400);
+  if (dhReady) await DigitalHuman.sayAndWait('drawing');
+  await delay(300);
 
   const deck = createDeck();
   const drawn = [deck[0], deck[1], deck[2]];
 
-  // 4. Reveal each card one by one
+  // 4. Reveal each card one by one (wait for each narration)
   const cardSayKeys = ['card1', 'card2', 'card3'];
   for (let i = 0; i < 3; i++) {
-    await delay(700);
-    if (dhReady) DigitalHuman.say(cardSayKeys[i]);
     const slot = document.getElementById('slot' + (i + 1));
     slot.classList.add('revealed');
     const card = drawn[i];
@@ -486,15 +495,14 @@ async function dealNow() {
         </div>
       </div>
     `;
-    if (dhReady) DigitalHuman.gesture('deal-card');
     // Pulse the matching houses
     highlightMatchingHouses(card.value);
-    await delay(500);
+    if (dhReady) await DigitalHuman.sayAndWait(cardSayKeys[i]);
     clearHouseHighlights();
   }
 
   // 5. Calculate results
-  await delay(400);
+  await delay(300);
 
   const bettedHouses = Object.keys(bets);
   let totalWin = 0;
@@ -668,6 +676,7 @@ function resetRound() {
   isDealing = false;
   updateBalanceUI();
   startBettingWindow();
+  startIdleChatter();  // Resume idle chatter for the new round
 }
 
 // === HISTORY ===
