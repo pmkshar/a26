@@ -2,8 +2,8 @@
 // A26 LIVE CARD GAME
 // 6 Houses (A, 2, 3, 4, 5, 6) · 1:1 / 1:2 / 1:4 payouts
 // AI virtual dealer with multi-pose card-cutting animation
-// Open access: guests play with 5,000 trial coins; registered
-// users play with their server-backed balance.
+// Open access: guests can play with UNLIMITED trial coins (no betting);
+// registered users play with their server-backed balance and can bet.
 // =========================================================
 
 // NOTE: Auth.requireAuth() is now a no-op so the game is open to guests.
@@ -39,21 +39,16 @@ let videoClockInterval = null;
 let dhReady = false;
 let idleChatInterval = null;
 let hasSpokenBetPlaced = false;  // Only speak "bet placed" once per round
-let isGuest = false;             // true if running in trial mode
+let isGuest = false;             // true if running in trial mode (unlimited coins, no betting)
 
 // === INIT ===
 document.addEventListener('DOMContentLoaded', async () => {
-  // Branch on guest vs registered user. Guests use the localStorage trial
-  // balance (5,000 coins); registered users use their server balance.
+  // Branch on guest vs registered user.
+  //   Guests  -> unlimited balance (∞), betting panel is LOCKED.
+  //   Players -> server-backed balance, betting panel is OPEN.
   isGuest = Auth.isGuest();
   if (isGuest) {
-    balance = Auth.getGuestBalance();
-    // If the guest has run out, give them a fresh 5,000 on this visit so
-    // they can keep exploring. (The "Out of coins" modal will fire if they
-    // actually try to place a bet with 0 balance.)
-    if (balance <= 0) {
-      balance = Auth.refillGuestBalance();
-    }
+    balance = Auth.getGuestBalance(); // large sentinel; effectively unlimited
   } else {
     const user = Auth.getUser();
     balance = user ? (user.balance || 0) : 0;
@@ -67,7 +62,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initButtons();
   startVideoClock();
   initScoreboard();
-  bindOutOfCoinsModal();
+  initBettingLock();
 
   // Initialize the AI Digital Human dealer
   try {
@@ -99,14 +94,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 // Update the trial-mode banner visibility and any other mode-dependent UI
 function updateModeUI() {
   Auth.updateNav();
+  applyBettingLock();
 }
 
 // Persist the current balance back to whatever store is appropriate:
-// localStorage for guests, server-synced for registered users (handled in
-// dealNow via /api/player/bet).
+// localStorage for guests (no-op since they're unlimited), server-synced
+// for registered users (handled in dealNow via /api/player/bet).
 function persistBalance() {
   if (isGuest) {
-    Auth.setGuestBalance(balance);
+    Auth.setGuestBalance(balance); // no-op for guests
   } else {
     const user = Auth.getUser();
     if (user) {
@@ -116,18 +112,39 @@ function persistBalance() {
   }
 }
 
-// Bind the "Out of coins" modal buttons (refill trial / go to login)
-function bindOutOfCoinsModal() {
-  const overlay = document.getElementById('outOfCoinsOverlay');
-  const refillBtn = document.getElementById('btnRefillTrial');
-  if (refillBtn) {
-    refillBtn.addEventListener('click', () => {
-      balance = Auth.refillGuestBalance();
-      persistBalance();
-      updateBalanceUI();
-      if (overlay) overlay.classList.remove('show');
-      flashMessage('5,000 trial coins added!');
+// ============================================================
+// GUEST BETTING LOCK
+// Guests cannot place bets. The betting panel is overlaid with a
+// "Register to Place Bets" prompt. They CAN press DEAL with no bets
+// to just see the cards being drawn (watch-only mode).
+// ============================================================
+function initBettingLock() {
+  // "Just watch this round" button — closes the lock overlay for the
+  // current round so the guest can press DEAL (which will deal cards
+  // with no bets, just to see what comes up).
+  const watchBtn = document.getElementById('btnJustWatch');
+  if (watchBtn) {
+    watchBtn.addEventListener('click', () => {
+      const overlay = document.getElementById('bettingLockOverlay');
+      const panel = document.getElementById('bettingPanel');
+      if (overlay) overlay.style.display = 'none';
+      if (panel) panel.classList.remove('locked');
+      flashMessage('Watch mode — press DEAL to draw cards.');
     });
+  }
+  applyBettingLock();
+}
+
+function applyBettingLock() {
+  const overlay = document.getElementById('bettingLockOverlay');
+  const panel = document.getElementById('bettingPanel');
+  if (!overlay || !panel) return;
+  if (isGuest) {
+    overlay.style.display = '';
+    panel.classList.add('locked');
+  } else {
+    overlay.style.display = 'none';
+    panel.classList.remove('locked');
   }
 }
 
@@ -277,17 +294,19 @@ function initChips() {
 // === PLACE BET ===
 function placeBet(house, amount) {
   if (!isBettingOpen || isDealing) return;
+  // Guests cannot place bets — the betting panel is locked. If somehow
+  // this is called for a guest (e.g. via console), refuse and re-apply the lock.
+  if (isGuest) {
+    applyBettingLock();
+    flashMessage('Register a free account to place bets.');
+    return;
+  }
   if (amount < MIN_BET || amount > MAX_BET) {
     flashMessage(`Bet must be between \u20B9${MIN_BET} and \u20B9${MAX_BET}`);
     if (dhReady) DigitalHuman.sayCustom(`Bet must be between ${MIN_BET} and ${MAX_BET} rupees.`, 'serious', 0.98, 0.98);
     return;
   }
   if (balance < amount) {
-    if (isGuest) {
-      // Guest ran out of trial coins — prompt to register or refill.
-      showOutOfCoinsModal();
-      return;
-    }
     flashMessage('Insufficient balance');
     if (dhReady) DigitalHuman.sayCustom('Insufficient balance. Please top up to continue.', 'sad', 0.96, 0.98);
     return;
@@ -332,11 +351,9 @@ function placeBet(house, amount) {
   } catch (e) { /* feed is optional */ }
 }
 
-// Show the "Out of trial coins" modal (guests only)
-function showOutOfCoinsModal() {
-  const overlay = document.getElementById('outOfCoinsOverlay');
-  if (overlay) overlay.classList.add('show');
-}
+// Show the "Out of trial coins" modal (no longer used — guests have unlimited
+// coins — kept as a no-op for backward-compat in case any code path still calls it).
+function showOutOfCoinsModal() { /* no-op */ }
 
 // Render the active bets summary panel
 function updateBetSummary() {
@@ -426,18 +443,29 @@ function updateDealButton() {
   const inputAmount = parseInt(document.getElementById('betInput').value) || 0;
   const hasSelectedHouse = document.querySelectorAll('.house.selected').length > 0;
   const hasChipsOnHouses = totalBet > 0;
-  // Can deal if: there are bets on houses OR a house is selected with valid amount in input
-  const canDeal = !isDealing && isBettingOpen && (
+  // Registered users can deal if: there are bets on houses OR a house is
+  // selected with a valid amount in the input.
+  let canDeal = !isDealing && isBettingOpen && (
     hasChipsOnHouses || (hasSelectedHouse && inputAmount >= MIN_BET && inputAmount <= MAX_BET)
   );
+  // Guests can always press DEAL during the betting window to draw cards in
+  // watch mode (no bets, just see what comes up). This lets them "play the
+  // game" without placing real bets.
+  if (isGuest && !isDealing && isBettingOpen) {
+    canDeal = true;
+  }
   btn.disabled = !canDeal;
 }
 
 function updateBalanceUI() {
-  document.getElementById('balance').textContent = '\u20B9' + balance.toLocaleString('en-IN');
-  document.getElementById('totalBet').textContent = '\u20B9' + totalBet.toLocaleString('en-IN');
-  document.getElementById('lastWin').textContent = '\u20B9' + lastWin.toLocaleString('en-IN');
-  document.getElementById('nav-balance').textContent = '\u20B9' + balance.toLocaleString('en-IN');
+  // Guests show "∞" everywhere; registered users show ₹ amounts.
+  const balanceStr = isGuest ? '\u221E' : ('\u20B9' + balance.toLocaleString('en-IN'));
+  const totalBetStr = isGuest ? '\u2014' : ('\u20B9' + totalBet.toLocaleString('en-IN'));
+  const lastWinStr = isGuest ? '\u2014' : ('\u20B9' + lastWin.toLocaleString('en-IN'));
+  document.getElementById('balance').textContent = balanceStr;
+  document.getElementById('totalBet').textContent = totalBetStr;
+  document.getElementById('lastWin').textContent = lastWinStr;
+  document.getElementById('nav-balance').textContent = balanceStr;
   document.getElementById('roundNum').textContent = round;
 }
 
@@ -447,9 +475,13 @@ function startBettingWindow() {
   hasSpokenBetPlaced = false;  // Reset for the new round
   betWindowStart = Date.now();
   setDealerPose('idle');
-  setDealerBubble('Place your bets');
+  setDealerBubble(isGuest ? 'Watch the round' : 'Place your bets');
   updateDealButton();
-  document.getElementById('betTimer').textContent = '20';
+  setBetTimerUI(20);
+
+  // Re-apply the betting lock for guests at the start of every round (in case
+  // they had pressed "Just watch this round" in the previous round).
+  applyBettingLock();
 
   // Tell the Live Activity engine to seed fake-player bets for this round
   try { LiveActivity.startRound(); } catch (e) { console.warn('LiveActivity.startRound failed:', e); }
@@ -457,15 +489,19 @@ function startBettingWindow() {
   betTimerInterval = setInterval(() => {
     const elapsed = Date.now() - betWindowStart;
     const remaining = Math.max(0, Math.ceil((BET_WINDOW_MS - elapsed) / 1000));
-    document.getElementById('betTimer').textContent = remaining;
+    setBetTimerUI(remaining);
     // Bet-closing warning at 5s (only if bets placed and not already speaking)
     if (remaining === 5 && dhReady && totalBet > 0 && !DigitalHuman.isSpeaking()) {
       DigitalHuman.say('betClosingSoon');
     }
     if (remaining <= 0) {
       clearInterval(betTimerInterval);
-      // Auto-deal if any bets placed
+      // Auto-deal if any bets placed (registered users) OR if guest is in
+      // watch mode (no bets but they should still see the round play out).
       if (totalBet > 0) {
+        dealNow();
+      } else if (isGuest) {
+        // Guest watch-mode: auto-deal with no bets so they see cards drawn.
         dealNow();
       } else {
         // Restart betting window if no bets
@@ -475,10 +511,21 @@ function startBettingWindow() {
   }, 250);
 }
 
+// Update the big bet timer element + apply urgency color states.
+function setBetTimerUI(remaining) {
+  const el = document.getElementById('betTimer');
+  if (!el) return;
+  el.textContent = remaining;
+  // Color urgency: green/gold (default) -> yellow at <=10s -> red at <=5s
+  el.classList.remove('urgent-mid', 'urgent-high');
+  if (remaining <= 5)      el.classList.add('urgent-high');
+  else if (remaining <= 10) el.classList.add('urgent-mid');
+}
+
 function stopBettingWindow() {
   isBettingOpen = false;
   if (betTimerInterval) clearInterval(betTimerInterval);
-  document.getElementById('betTimer').textContent = '0';
+  setBetTimerUI(0);
   updateDealButton();
 }
 
@@ -502,7 +549,9 @@ function createDeck() {
 async function dealNow() {
   if (isDealing) return;
 
-  // If a house is selected AND amount in input, place that bet first
+  // If a house is selected AND amount in input, place that bet first.
+  // (Guests can't place bets — placeBet refuses them — so selected.length
+  // will always be 0 for guests since the betting panel is locked.)
   const inputAmount = parseInt(document.getElementById('betInput').value) || 0;
   const selected = document.querySelectorAll('.house.selected');
   if (selected.length > 0 && inputAmount >= MIN_BET && inputAmount <= MAX_BET) {
@@ -514,7 +563,9 @@ async function dealNow() {
     selected.forEach(el => placeBet(el.dataset.house, inputAmount));
   }
 
-  if (totalBet === 0) {
+  // Guests can deal with no bets (watch-only mode). Registered users must
+  // have at least one bet.
+  if (totalBet === 0 && !isGuest) {
     flashMessage('Please place at least one bet');
     return;
   }
@@ -633,6 +684,10 @@ async function dealNow() {
       if (bestMatchCount === 3) { DigitalHuman.setEmotion('surprised'); DigitalHuman.say('win3'); }
       else if (bestMatchCount === 2) { DigitalHuman.setEmotion('happy'); DigitalHuman.say('win2'); }
       else { DigitalHuman.setEmotion('happy'); DigitalHuman.say('win1'); }
+    } else if (isGuest && totalBet === 0) {
+      // Guest watch-mode — no win, no loss, just observing.
+      DigitalHuman.setPose('reveal-win');
+      DigitalHuman.setEmotion('neutral');
     } else {
       DigitalHuman.setPose('reveal-lose');
       DigitalHuman.setEmotion('sad');
@@ -667,15 +722,17 @@ async function dealNow() {
   balance += totalWin;
   lastWin = totalWin;
 
-  // Persist the new balance (guest: localStorage; registered: localStorage
-  // and server-sync below)
+  // Persist the new balance (guest: no-op; registered: localStorage + server below)
   persistBalance();
 
   // Show result banner
   const banner = document.getElementById('resultBanner');
   if (totalWin > 0) {
-    banner.textContent = `YOU WON ₹${totalWin.toLocaleString('en-IN')}!`;
+    banner.textContent = `YOU WON \u20B9${totalWin.toLocaleString('en-IN')}!`;
     banner.className = 'result-banner show win';
+  } else if (isGuest && totalBet === 0) {
+    banner.textContent = `WATCH MODE — Cards drawn: ${drawn.map(c => c.value).join(' · ')}`;
+    banner.className = 'result-banner show';
   } else {
     banner.textContent = `NO LUCK THIS ROUND`;
     banner.className = 'result-banner show lose';
@@ -686,12 +743,25 @@ async function dealNow() {
   if (totalWin > 0) {
     md.innerHTML = resultDetails.filter(d => d.includes('match')).join('<br>');
     md.className = 'matches-display show win';
+  } else if (isGuest && totalBet === 0) {
+    // Guest watch-mode — show which houses would have matched.
+    const watchMatches = [];
+    HOUSES.forEach(h => {
+      const mc = drawn.filter(c => c.value === h).length;
+      if (mc > 0) watchMatches.push(`House ${h}: ${mc} match${mc > 1 ? 'es' : ''}`);
+    });
+    md.innerHTML = watchMatches.length
+      ? 'Would have matched: ' + watchMatches.join(' · ')
+      : 'No matches this round';
+    md.className = 'matches-display show';
   } else {
     md.innerHTML = 'No matches this round';
     md.className = 'matches-display show lose';
   }
 
-  if (!dhReady) setDealerBubble(totalWin > 0 ? `You won ₹${totalWin.toLocaleString('en-IN')}!` : 'Better luck next round');
+  if (!dhReady) setDealerBubble(totalWin > 0
+    ? `You won \u20B9${totalWin.toLocaleString('en-IN')}!`
+    : (isGuest && totalBet === 0 ? 'Watch mode' : 'Better luck next round'));
 
   // Save history
   history.unshift({
@@ -756,14 +826,17 @@ function showResultModal(drawn, bettedHouses, totalWin, totalBet, resultDetails)
   const amountEl = document.getElementById('resultAmount');
 
   cardsEl.textContent = 'Cards drawn: ' + drawn.map(c => c.value + c.suit).join('  ');
-  matchesEl.innerHTML = resultDetails.join('<br>');
+  matchesEl.innerHTML = resultDetails.length ? resultDetails.join('<br>') : 'No bets placed (watch mode).';
 
   if (totalWin > 0) {
     title.textContent = 'You Win!';
-    amountEl.innerHTML = `<div class="win-amount">+₹${totalWin.toLocaleString('en-IN')}</div><div style="font-size:0.8rem;color:#aaa;margin-top:4px;">Net: ₹${(totalWin - totalBet).toLocaleString('en-IN')}</div>`;
+    amountEl.innerHTML = `<div class="win-amount">+\u20B9${totalWin.toLocaleString('en-IN')}</div><div style="font-size:0.8rem;color:#aaa;margin-top:4px;">Net: \u20B9${(totalWin - totalBet).toLocaleString('en-IN')}</div>`;
+  } else if (isGuest && totalBet === 0) {
+    title.textContent = 'Watch Mode';
+    amountEl.innerHTML = `<div style="color:var(--gold-light);font-size:1rem;margin-top:6px;">You're playing in trial mode.</div><div style="font-size:0.78rem;color:#bbb;margin-top:6px;"><a href="/login.html" style="color:var(--gold);text-decoration:underline;">Register a free account</a> to place real bets.</div>`;
   } else {
     title.textContent = 'No Luck';
-    amountEl.innerHTML = `<div class="lose-text">-₹${totalBet.toLocaleString('en-IN')}</div>`;
+    amountEl.innerHTML = `<div class="lose-text">-\u20B9${totalBet.toLocaleString('en-IN')}</div>`;
   }
 
   overlay.classList.add('show');

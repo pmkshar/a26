@@ -1,13 +1,17 @@
 // Auth utilities for A26 game
 // Supports two access modes:
-//   1. GUEST  — anyone can play with 5,000 trial coins (stored in localStorage).
-//               No login required. Bets and wins update the local trial balance.
-//   2. PLAYER — registered user with a server-backed balance. Required only for
-//               "real money" play. Login/register at /login.html.
+//   1. GUEST  — anyone can play with UNLIMITED trial coins. Guests can deal
+//               cards and watch the game, but the betting panel is locked.
+//               To place actual bets, they must register.
+//   2. PLAYER — registered user with a server-backed balance. Required for
+//               placing real bets. Login/register at /login.html.
 const API_BASE = '';
-const GUEST_TRIAL_BALANCE = 5000;
 const GUEST_BALANCE_KEY = 'a26_guest_balance';
 const GUEST_NAME_KEY = 'a26_guest_name';
+// Guests have unlimited coins for "playing" (dealing, watching) — but the
+// betting panel is locked, so the balance is purely cosmetic. We store a
+// big sentinel so existing arithmetic in game.js still works if needed.
+const GUEST_BALANCE_SENTINEL = 999999999;
 
 const Auth = {
   getToken() {
@@ -27,7 +31,6 @@ const Auth = {
   logout() {
     localStorage.removeItem('a26_token');
     localStorage.removeItem('a26_user');
-    // Keep the guest balance so the user can resume trial play after logout
     window.location.href = '/login.html';
   },
 
@@ -45,26 +48,29 @@ const Auth = {
     return !this.isLoggedIn();
   },
 
-  // Returns the current guest balance (defaults to GUEST_TRIAL_BALANCE on first visit)
+  // Returns the guest balance. Always unlimited (the sentinel). We keep the
+  // localStorage entry for backward-compat with older clients.
   getGuestBalance() {
-    const raw = localStorage.getItem(GUEST_BALANCE_KEY);
-    if (raw === null) {
-      localStorage.setItem(GUEST_BALANCE_KEY, String(GUEST_TRIAL_BALANCE));
-      return GUEST_TRIAL_BALANCE;
+    let raw = localStorage.getItem(GUEST_BALANCE_KEY);
+    if (raw === null || isNaN(parseInt(raw, 10))) {
+      localStorage.setItem(GUEST_BALANCE_KEY, String(GUEST_BALANCE_SENTINEL));
     }
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) ? n : GUEST_TRIAL_BALANCE;
+    return GUEST_BALANCE_SENTINEL;
   },
 
   setGuestBalance(amount) {
-    const n = Math.max(0, Math.floor(amount || 0));
-    localStorage.setItem(GUEST_BALANCE_KEY, String(n));
-    return n;
+    // No-op for guests — their balance is always unlimited. Kept for
+    // backward-compat with code that calls this on every bet/clear.
+    return GUEST_BALANCE_SENTINEL;
   },
 
-  // Refill the trial balance (called when the user clicks "Get 5,000 more")
   refillGuestBalance() {
-    return this.setGuestBalance(GUEST_TRIAL_BALANCE);
+    return GUEST_BALANCE_SENTINEL;
+  },
+
+  // Whether the guest balance should be shown as "∞" in the UI.
+  isGuestBalanceUnlimited() {
+    return true;
   },
 
   // Generate / retrieve a friendly guest display name like "Guest_3847"
@@ -112,9 +118,13 @@ const Auth = {
     return data;
   },
 
+  // Format a balance for display. Guests show "∞"; registered users show ₹X.
+  formatBalance(amount) {
+    if (this.isGuest()) return '\u221E'; // ∞
+    return '\u20B9' + Number(amount || 0).toLocaleString('en-IN');
+  },
+
   // === NAV BAR UPDATE ===
-  // Now also handles guest mode: shows "Login / Register" link and a TRIAL
-  // badge instead of username/balance.
   updateNav() {
     const navUser = document.getElementById('nav-user');
     const navBalance = document.getElementById('nav-balance');
@@ -149,11 +159,10 @@ const Auth = {
         navLogout.dataset.bound = '1';
       }
     } else {
-      // Guest nav
+      // Guest nav — show "∞" balance and TRIAL badge
       const guestName = this.getGuestName();
-      const guestBal = this.getGuestBalance();
       if (navUser) navUser.textContent = guestName;
-      if (navBalance) navBalance.textContent = '\u20B9' + guestBal.toLocaleString('en-IN');
+      if (navBalance) navBalance.textContent = '\u221E'; // ∞
       if (navModeBadge) {
         navModeBadge.style.display = '';
         navModeBadge.textContent = 'TRIAL';

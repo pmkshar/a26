@@ -1,7 +1,7 @@
 // A26 Service Worker - PWA offline support
 // Strategy: network-first for HTML/JS/CSS (so users always get latest),
 //           cache-first for images/icons (they rarely change).
-const CACHE_NAME = 'a26-v12-open-access';
+const CACHE_NAME = 'a26-v13-logo-unlimited';
 const PRECACHE_ASSETS = [
   '/',
   '/login.html',
@@ -16,7 +16,9 @@ const PRECACHE_ASSETS = [
   '/icons/icon-192.png',
   '/icons/icon-256.png',
   '/icons/icon-512.png',
-  '/icons/apple-touch-icon.png'
+  '/icons/apple-touch-icon.png',
+  '/images/a26-logo.svg',
+  '/images/a26-nav-logo.svg'
 ];
 
 // Install - precache assets

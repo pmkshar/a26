@@ -80,6 +80,20 @@ body::before {
 
 .auth-logo { text-align: center; margin-bottom: 25px; }
 
+.auth-logo-img {
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 8px;
+  display: block;
+  filter: drop-shadow(0 6px 18px rgba(0,0,0,0.6));
+  animation: logoEntrance 0.7s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes logoEntrance {
+  0%   { transform: scale(0.6) rotate(-8deg); opacity: 0; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
 .auth-logo h1 {
   font-family: var(--font-display);
   font-size: 3rem;
@@ -249,6 +263,40 @@ body::before {
   color: var(--gold-light);
   text-decoration: none;
   letter-spacing: 2px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-brand-logo {
+  height: 38px;
+  width: auto;
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+.nav-brand-fallback {
+  /* Hidden by default when the SVG logo loads; we hide the SVG via onerror
+     if it fails, which falls back to this text. */
+  display: none;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--gold-light);
+  letter-spacing: 2px;
+}
+
+/* When the inline <img> logo is hidden (onerror), reveal the text fallback. */
+.nav-brand-logo:not([style*="display: none"]) + .nav-brand-fallback,
+.nav-brand-logo[src] + .nav-brand-fallback {
+  /* default: keep fallback hidden while the SVG is showing */
+  display: none;
+}
+.nav-brand:has(.nav-brand-logo[style*="display: none"]) .nav-brand-fallback {
+  display: inline;
+}
+
+@media (max-width: 600px) {
+  .nav-brand-logo { height: 30px; }
 }
 
 .nav-info {
@@ -517,26 +565,79 @@ body::before {
   position: absolute;
   bottom: 0; left: 0; right: 0;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
-  padding: 8px 10px;
-  background: linear-gradient(0deg, rgba(0,0,0,0.85), transparent);
+  padding: 10px 10px 14px;
+  background: linear-gradient(0deg, rgba(0,0,0,0.92), rgba(0,0,0,0.5) 60%, transparent);
   z-index: 4;
+}
+
+/* ============================================================
+   BIG BET TIMER (per user request: "keep the timer big")
+   ============================================================ */
+.bet-timer-big-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  background: radial-gradient(circle at center, rgba(212,168,67,0.18), rgba(0,0,0,0.6) 70%);
+  border: 2px solid var(--gold);
+  border-radius: 14px;
+  padding: 6px 22px 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5), 0 0 18px rgba(212,168,67,0.25);
+  min-width: 180px;
 }
 
 .bet-timer-label {
   color: var(--gold);
-  font-size: 0.6rem;
-  letter-spacing: 1.5px;
-  font-weight: 600;
+  font-size: 0.65rem;
+  letter-spacing: 2px;
+  font-weight: 700;
+  text-transform: uppercase;
+  opacity: 0.85;
 }
 
-.bet-timer {
+.bet-timer-big {
   font-family: var(--font-display);
   color: var(--gold-light);
-  font-size: 1.4rem;
-  font-weight: 700;
-  text-shadow: 0 0 8px rgba(212,168,67,0.4);
+  font-size: clamp(2.6rem, 6vw, 3.4rem);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 16px rgba(212,168,67,0.7), 0 2px 6px rgba(0,0,0,0.6);
+  letter-spacing: 2px;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.3s, text-shadow 0.3s;
+}
+
+.bet-timer-unit {
+  font-size: 0.6rem;
+  color: var(--gold);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: -2px;
+  opacity: 0.7;
+}
+
+/* Colour-coded urgency states for the big timer */
+.bet-timer-big.urgent-mid {
+  color: #ffd56b;
+  text-shadow: 0 0 18px rgba(255,213,107,0.8), 0 2px 6px rgba(0,0,0,0.6);
+}
+.bet-timer-big.urgent-high {
+  color: #ff7a6b;
+  text-shadow: 0 0 22px rgba(255,122,107,0.95), 0 2px 6px rgba(0,0,0,0.6);
+  animation: timerPulse 0.7s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.08); }
+}
+
+@media (max-width: 600px) {
+  .bet-timer-big { font-size: 2.2rem; }
+  .bet-timer-big-wrap { min-width: 150px; padding: 5px 16px 8px; }
 }
 
 /* Dealer image stack */
@@ -1268,6 +1369,108 @@ body::before {
   border: 1px solid var(--gold);
   border-radius: 12px;
   padding: 12px;
+  position: relative;
+}
+
+/* ============================================================
+   GUEST LOCK OVERLAY — covers the betting panel for guests.
+   Guests have unlimited coins for "playing" but cannot place
+   real bets until they register.
+   ============================================================ */
+.betting-lock-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(2,26,14,0.92), rgba(2,26,14,0.96));
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  text-align: center;
+  z-index: 5;
+  border: 2px dashed var(--gold);
+  animation: lockFadeIn 0.35s ease-out;
+}
+
+@keyframes lockFadeIn {
+  from { opacity: 0; transform: scale(0.97); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.betting-lock-overlay .lock-icon {
+  font-size: 2.6rem;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.5));
+  animation: lockBob 2.2s ease-in-out infinite;
+}
+
+@keyframes lockBob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-4px); }
+}
+
+.betting-lock-overlay .lock-title {
+  font-family: var(--font-heading);
+  color: var(--gold-light);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.betting-lock-overlay .lock-sub {
+  color: #d8d8d8;
+  font-size: 0.78rem;
+  max-width: 320px;
+  line-height: 1.45;
+}
+
+.betting-lock-overlay .lock-cta {
+  display: inline-block;
+  margin-top: 4px;
+  background: linear-gradient(135deg, #d4a843, #f0d68a);
+  color: #021a0e !important;
+  text-decoration: none;
+  padding: 10px 22px;
+  border-radius: 24px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  border: 1px solid rgba(255,255,255,0.25);
+  box-shadow: 0 4px 14px rgba(212,168,67,0.4);
+  transition: all 0.2s;
+}
+
+.betting-lock-overlay .lock-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212,168,67,0.6);
+}
+
+.betting-lock-overlay .lock-just-watch {
+  background: transparent;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+  padding: 6px 14px;
+  border-radius: 16px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: all 0.2s;
+}
+
+.betting-lock-overlay .lock-just-watch:hover {
+  background: rgba(212,168,67,0.15);
+  color: var(--gold-light);
+}
+
+/* When the betting panel is locked, dim the contents underneath */
+.betting-panel.locked > *:not(.betting-lock-overlay) {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: grayscale(0.4);
 }
 
 .bet-header {

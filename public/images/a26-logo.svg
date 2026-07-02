@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a2a18"/>
+      <stop offset="100%" stop-color="#021a0e"/>
+    </linearGradient>
+    <linearGradient id="goldGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5e6b8"/>
+      <stop offset="50%" stop-color="#d4a843"/>
+      <stop offset="100%" stop-color="#a8801f"/>
+    </linearGradient>
+    <linearGradient id="redGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#e74c5b"/>
+      <stop offset="100%" stop-color="#8c1620"/>
+    </linearGradient>
+    <radialGradient id="shineGrad" cx="0.3" cy="0.2" r="0.7">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.5)"/>
+      <stop offset="60%" stop-color="rgba(255,255,255,0)"/>
+    </radialGradient>
+    <filter id="goldShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Outer casino-chip circle -->
+  <circle cx="256" cy="256" r="250" fill="url(#bgGrad)" stroke="url(#goldGrad)" stroke-width="10"/>
+  <circle cx="256" cy="256" r="240" fill="none" stroke="url(#goldGrad)" stroke-width="2" stroke-dasharray="6 6" opacity="0.7"/>
+
+  <!-- Decorative chip dashes around the rim -->
+  <g fill="url(#goldGrad)" opacity="0.85">
+    <rect x="248" y="14" width="16" height="22" rx="2"/>
+    <rect x="248" y="476" width="16" height="22" rx="2"/>
+    <rect x="14" y="248" width="22" height="16" rx="2"/>
+    <rect x="476" y="248" width="22" height="16" rx="2"/>
+    <!-- diagonals -->
+    <g transform="rotate(45 256 256)">
+      <rect x="248" y="22" width="16" height="18" rx="2"/>
+      <rect x="248" y="472" width="16" height="18" rx="2"/>
+    </g>
+    <g transform="rotate(-45 256 256)">
+      <rect x="248" y="22" width="16" height="18" rx="2"/>
+      <rect x="248" y="472" width="16" height="18" rx="2"/>
+    </g>
+  </g>
+
+  <!-- Inner felt circle -->
+  <circle cx="256" cy="256" r="200" fill="#062818" stroke="url(#goldGrad)" stroke-width="3"/>
+
+  <!-- Spade card (left, tilted) -->
+  <g transform="translate(105 145) rotate(-15)" filter="url(#goldShadow)">
+    <rect x="0" y="0" width="120" height="170" rx="10" fill="#fff8ee"/>
+    <rect x="0" y="0" width="120" height="170" rx="10" fill="url(#shineGrad)"/>
+    <text x="14" y="34" font-family="Playfair Display, serif" font-size="28" font-weight="900" fill="#1a1a1a">A</text>
+    <path d="M60 50 C 50 70, 35 80, 50 100 C 55 108, 65 108, 65 95 L 60 120 L 75 120 L 70 95 C 70 108, 80 108, 85 100 C 100 80, 85 70, 75 50 C 70 60, 65 60, 60 50 Z" fill="#1a1a1a" transform="translate(0 10)"/>
+    <text x="106" y="156" font-family="Playfair Display, serif" font-size="28" font-weight="900" fill="#1a1a1a" transform="rotate(180 106 156)">A</text>
+  </g>
+
+  <!-- Red 6 card (right, tilted) -->
+  <g transform="translate(287 145) rotate(15)" filter="url(#goldShadow)">
+    <rect x="0" y="0" width="120" height="170" rx="10" fill="#fff8ee"/>
+    <rect x="0" y="0" width="120" height="170" rx="10" fill="url(#shineGrad)"/>
+    <text x="14" y="34" font-family="Playfair Display, serif" font-size="28" font-weight="900" fill="#c41e3a">6</text>
+    <!-- heart suit -->
+    <path d="M60 50 C 50 35, 30 40, 30 60 C 30 80, 60 105, 60 105 C 60 105, 90 80, 90 60 C 90 40, 70 35, 60 50 Z" fill="#c41e3a" transform="translate(0 10)"/>
+    <text x="106" y="156" font-family="Playfair Display, serif" font-size="28" font-weight="900" fill="#c41e3a" transform="rotate(180 106 156)">6</text>
+  </g>
+
+  <!-- A26 wordmark across the bottom -->
+  <g transform="translate(256 410)">
+    <!-- backing ribbon -->
+    <path d="M -150 -28 L 150 -28 L 130 0 L 150 28 L -150 28 L -130 0 Z" fill="url(#bgGrad)" stroke="url(#goldGrad)" stroke-width="2"/>
+    <text x="0" y="14" text-anchor="middle" font-family="Cinzel Decorative, Playfair Display, serif" font-size="56" font-weight="900" fill="url(#goldGrad)" letter-spacing="6">A26</text>
+  </g>
+
+  <!-- Subtle top "LIVE GAME" tag -->
+  <g transform="translate(256 90)">
+    <rect x="-65" y="-14" width="130" height="28" rx="14" fill="url(#redGrad)" stroke="url(#goldGrad)" stroke-width="1"/>
+    <circle cx="-46" cy="0" r="4" fill="#fff"/>
+    <text x="6" y="5" text-anchor="middle" font-family="Montserrat, sans-serif" font-size="13" font-weight="700" fill="#fff" letter-spacing="2">LIVE GAME</text>
+  </g>
+</svg>

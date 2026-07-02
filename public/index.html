@@ -10,16 +10,20 @@
 <meta name="description" content="A26 - Live Card Game with 6 houses and AI virtual dealer">
 <title>A26 - Live Card Game</title>
 <link rel="manifest" href="/manifest.json">
-<link rel="icon" type="image/png" href="/icons/icon-192.png">
-<link rel="apple-touch-icon" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" href="/icons/icon-256.png">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" type="image/svg+xml" href="/images/a26-logo.svg">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=dh11">
+<link rel="stylesheet" href="/css/style.css?v=dh12">
 </head>
 <body>
 
 <!-- TOP NAV -->
 <div class="top-nav">
-  <a href="/index.html" class="nav-brand">A26</a>
+  <a href="/index.html" class="nav-brand">
+    <img src="/images/a26-nav-logo.svg" alt="A26" class="nav-brand-logo" onerror="this.style.display='none'">
+    <span class="nav-brand-fallback">A26</span>
+  </a>
   <div class="nav-info">
     <span class="nav-user" id="nav-user"></span>
     <span class="nav-balance" id="nav-balance">₹0</span>
@@ -37,10 +41,10 @@
 <div class="trial-banner" id="trialBanner" style="display:none;">
   <div class="trial-banner-inner">
     <div class="trial-banner-text">
-      <strong>TRIAL MODE</strong> · Playing with 5,000 sample coins.
-      Register a free account to bet with real stakes and unlock your dashboard.
+      <strong>TRIAL MODE</strong> · You're playing with unlimited sample coins — explore the game freely.
+      To place real bets, register a free account.
     </div>
-    <a href="/login.html" class="trial-banner-btn">Register to Bet Real Money →</a>
+    <a href="/login.html" class="trial-banner-btn">Register to Bet →</a>
   </div>
 </div>
 
@@ -80,10 +84,13 @@
       <!-- Dealer name plate -->
       <div class="dealer-switch"></div>
 
-      <!-- Bottom bet status -->
+      <!-- Bottom bet status — BIG TIMER -->
       <div class="video-overlay-bottom">
-        <span class="bet-timer-label">BET CLOSES IN</span>
-        <span class="bet-timer" id="betTimer">--</span>
+        <div class="bet-timer-big-wrap">
+          <span class="bet-timer-label">BET CLOSES IN</span>
+          <span class="bet-timer-big" id="betTimer">--</span>
+          <span class="bet-timer-unit">sec</span>
+        </div>
       </div>
     </div>
 
@@ -126,7 +133,7 @@
     <div class="result-banner" id="resultBanner"></div>
 
     <!-- BETTING PANEL -->
-    <div class="betting-panel">
+    <div class="betting-panel" id="bettingPanel">
       <div class="bet-header">
         <h3>Place Your Bet</h3>
         <div class="selected-house-display" id="selectedHouseDisplay">Select a house</div>
@@ -162,6 +169,15 @@
       <div class="control-buttons">
         <button class="btn-clear" id="btnClear">CLEAR</button>
         <button class="btn-deal" id="btnDeal" disabled>DEAL</button>
+      </div>
+
+      <!-- GUEST LOCK OVERLAY (covers the betting panel for guests) -->
+      <div class="betting-lock-overlay" id="bettingLockOverlay">
+        <div class="lock-icon">🔒</div>
+        <div class="lock-title">Register to Place Bets</div>
+        <div class="lock-sub">Guests can play and watch the game freely with unlimited coins, but placing real bets requires a free account.</div>
+        <a href="/login.html" class="lock-cta">Register / Login →</a>
+        <button class="lock-just-watch" id="btnJustWatch">Just watch this round</button>
       </div>
     </div>
 
@@ -215,20 +231,6 @@
   </div>
 </div>
 
-<!-- OUT-OF-COINS MODAL (guest ran out of trial coins) -->
-<div class="result-overlay" id="outOfCoinsOverlay">
-  <div class="result-modal">
-    <h2 style="color:#f0c674;">Out of Trial Coins</h2>
-    <div class="result-detail" style="text-align:center;color:#ddd;">
-      You've used up your 5,000 sample coins.<br>Register a free account to bet with real stakes and unlock your dashboard.
-    </div>
-    <div style="display:flex;gap:10px;margin-top:14px;">
-      <a href="/login.html" class="btn-close" style="text-decoration:none;text-align:center;background:linear-gradient(135deg,#d4a843,#f0d68a);color:#021a0e;">Register / Login</a>
-      <button class="btn-close" id="btnRefillTrial" style="background:#444;color:#fff;">Get 5,000 more</button>
-    </div>
-  </div>
-</div>
-
 <!-- RULES -->
 <button class="rules-toggle" id="btnRules" aria-label="Rules">?</button>
 <div class="rules-panel" id="rulesPanel">
@@ -246,10 +248,10 @@
   <p><strong>Card Values:</strong> A = Ace · 2-10 = face value · J, Q, K count as their rank only when house matches.</p>
 </div>
 
-<script src="/js/auth.js?v=dh11"></script>
-<script src="/js/digital-human.js?v=dh11"></script>
-<script src="/js/live-activity.js?v=dh11"></script>
-<script src="/js/game.js?v=dh11"></script>
+<script src="/js/auth.js?v=dh12"></script>
+<script src="/js/digital-human.js?v=dh12"></script>
+<script src="/js/live-activity.js?v=dh12"></script>
+<script src="/js/game.js?v=dh12"></script>
 <script>
 // PWA service worker registration
 if ('serviceWorker' in navigator) {
