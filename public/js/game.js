@@ -69,6 +69,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.warn('Digital Human init failed:', e);
   }
 
+  // Initialize the Live Activity engine (other players' bets + wins feed)
+  try {
+    LiveActivity.init();
+  } catch (e) {
+    console.warn('LiveActivity init failed:', e);
+  }
+
   // Begin first betting window
   startBettingWindow();
 });
@@ -260,6 +267,11 @@ function placeBet(house, amount) {
     hasSpokenBetPlaced = true;
     DigitalHuman.say('betPlaced');
   }
+  // Push the player's own bet to the Live Activity feed
+  try {
+    const me = (Auth.getUser() && Auth.getUser().username) || 'You';
+    LiveActivity.pushEvent('bet', { name: me, house, amount });
+  } catch (e) { /* feed is optional */ }
 }
 
 // Render the active bets summary panel
@@ -373,6 +385,9 @@ function startBettingWindow() {
   setDealerBubble('Place your bets');
   updateDealButton();
   document.getElementById('betTimer').textContent = '20';
+
+  // Tell the Live Activity engine to seed fake-player bets for this round
+  try { LiveActivity.startRound(); } catch (e) { console.warn('LiveActivity.startRound failed:', e); }
 
   betTimerInterval = setInterval(() => {
     const elapsed = Date.now() - betWindowStart;
@@ -559,6 +574,30 @@ async function dealNow() {
       DigitalHuman.say('lose');
     }
   }
+
+  // Resolve all fake players' bets using the SAME drawn cards so their
+  // wins/losses show up in the Live Activity feed.
+  try { LiveActivity.resolveRound(drawn); } catch (e) { console.warn('LiveActivity.resolveRound failed:', e); }
+
+  // Also push the player's own result to the Live Activity feed so they
+  // see themselves alongside the other players.
+  try {
+    const me = (Auth.getUser() && Auth.getUser().username) || 'You';
+    if (totalWin > 0) {
+      LiveActivity.pushEvent('win', {
+        name: me,
+        house: Object.keys(bets).join(','),
+        matches: bestMatchCount,
+        amount: totalWin
+      });
+    } else if (totalBet > 0) {
+      LiveActivity.pushEvent('lose', {
+        name: me,
+        house: Object.keys(bets).join(','),
+        amount: totalBet
+      });
+    }
+  } catch (e) { /* feed is optional */ }
 
   balance += totalWin;
   lastWin = totalWin;

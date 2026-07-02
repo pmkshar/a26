@@ -670,6 +670,194 @@ body::before {
 .bead-win { background: var(--win-green); }
 .bead-lose { background: var(--lose-red); }
 
+/* ============================================================
+   LIVE ACTIVITY FEED (other players' bets + wins in real-time)
+   ============================================================ */
+.live-activity {
+  background: linear-gradient(180deg, rgba(0,0,0,0.5), rgba(0,0,0,0.35));
+  border: 1px solid rgba(212,168,67,0.45);
+  border-radius: 10px;
+  padding: 8px 10px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  min-height: 120px;
+}
+
+.live-activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(212,168,67,0.25);
+}
+
+.live-activity-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gold-light);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.live-activity-title .live-dot {
+  width: 8px;
+  height: 8px;
+  background: #ff3b3b;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(255,59,59,0.8);
+  animation: liveDotPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes liveDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.8); }
+}
+
+.live-activity-count {
+  font-size: 0.65rem;
+  color: rgba(255,255,255,0.7);
+  font-weight: 600;
+}
+
+.live-activity-feed {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold) transparent;
+}
+.live-activity-feed::-webkit-scrollbar { width: 4px; }
+.live-activity-feed::-webkit-scrollbar-thumb { background: var(--gold); border-radius: 2px; }
+
+.live-activity-empty {
+  color: var(--gold);
+  font-size: 0.7rem;
+  opacity: 0.5;
+  text-align: center;
+  padding: 16px 4px;
+}
+
+/* Each event row in the feed */
+.la-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-family: var(--font-body);
+  background: rgba(255,255,255,0.04);
+  border-left: 3px solid rgba(212,168,67,0.4);
+  animation: laSlideIn 0.4s ease-out;
+}
+
+@keyframes laSlideIn {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.la-item.la-bet    { border-left-color: var(--gold); }
+.la-item.la-win    { border-left-color: var(--win-green); background: rgba(46,204,113,0.10); }
+.la-item.la-lose   { border-left-color: var(--lose-red); background: rgba(196,30,58,0.10); }
+.la-item.la-join   { border-left-color: #6ddba0; }
+.la-item.la-leave  { border-left-color: #888; opacity: 0.7; }
+.la-item.la-bigwin {
+  border-left-color: #ff8a7a;
+  background: linear-gradient(90deg, rgba(255,138,122,0.18), rgba(255,215,110,0.10));
+  animation: laSlideIn 0.4s ease-out, laBigwinGlow 1.6s ease-in-out infinite;
+}
+@keyframes laBigwinGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(255,138,122,0.3); }
+  50%      { box-shadow: 0 0 12px rgba(255,138,122,0.7); }
+}
+
+.la-icon {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.la-text {
+  flex: 1;
+  color: rgba(255,255,255,0.88);
+  line-height: 1.25;
+  word-break: break-word;
+}
+.la-text b {
+  color: #fff;
+  font-weight: 700;
+}
+.la-win-amt {
+  color: #6ddba0 !important;
+}
+
+.la-time {
+  font-size: 0.58rem;
+  color: rgba(255,255,255,0.4);
+  flex-shrink: 0;
+  font-family: var(--font-body);
+}
+
+/* === LIVE BETS BADGE on each house === */
+/* Shows "# players · ₹total" being bet on that house by other players
+   in the current round. Positioned at the top-right of each house tile. */
+.house-live-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: linear-gradient(135deg, rgba(0,0,0,0.85), rgba(40,20,8,0.85));
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  padding: 2px 6px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: var(--gold-light);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+.house-live-badge .hlb-players {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #fff;
+}
+.house-live-badge .hlb-total {
+  color: var(--gold-light);
+  font-weight: 700;
+}
+.house-live-badge.pulse {
+  animation: hlbPulse 0.6s ease-out;
+}
+@keyframes hlbPulse {
+  0%   { transform: scale(1); box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+  50%  { transform: scale(1.12); box-shadow: 0 0 14px rgba(212,168,67,0.7); }
+  100% { transform: scale(1); box-shadow: 0 2px 6px rgba(0,0,0,0.5); }
+}
+
+@media (max-width: 480px) {
+  .live-activity { max-height: 200px; min-height: 100px; padding: 6px 8px; }
+  .live-activity-title { font-size: 0.7rem; }
+  .live-activity-count { font-size: 0.58rem; }
+  .la-item { font-size: 0.62rem; padding: 3px 5px; }
+  .la-icon { font-size: 0.75rem; width: 14px; }
+  .la-time { font-size: 0.5rem; }
+  .house-live-badge { font-size: 0.5rem; padding: 1px 4px; }
+}
+
 /* === TABLE WITH 6 HOUSES === */
 .table-container {
   position: relative;

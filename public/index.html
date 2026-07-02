@@ -13,7 +13,7 @@
 <link rel="icon" type="image/png" href="/icons/icon-192.png">
 <link rel="apple-touch-icon" href="/icons/icon-192.png">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Cinzel+Decorative:wght@700;900&family=Montserrat:wght@400;600;700&family=Great+Vibes&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/css/style.css?v=dh9">
+<link rel="stylesheet" href="/css/style.css?v=dh10">
 </head>
 <body>
 
@@ -92,6 +92,19 @@
     <!-- SCOREBOARD / HISTORY -->
     <div class="scoreboard" id="scoreboard">
       <div class="scoreboard-empty">No rounds yet</div>
+    </div>
+
+    <!-- LIVE ACTIVITY FEED — shows other players' bets and wins in real-time -->
+    <div class="live-activity" id="liveActivity">
+      <div class="live-activity-header">
+        <span class="live-activity-title">
+          <span class="live-dot"></span> Live Activity
+        </span>
+        <span class="live-activity-count" id="liveActivityCount">0 players online</span>
+      </div>
+      <div class="live-activity-feed" id="liveActivityFeed">
+        <div class="live-activity-empty">Waiting for other players to join...</div>
+      </div>
     </div>
 
     <!-- TABLE WITH 6 HOUSES -->
@@ -204,9 +217,10 @@
   <p><strong>Card Values:</strong> A = Ace · 2-10 = face value · J, Q, K count as their rank only when house matches.</p>
 </div>
 
-<script src="/js/auth.js?v=dh9"></script>
-<script src="/js/digital-human.js?v=dh9"></script>
-<script src="/js/game.js?v=dh9"></script>
+<script src="/js/auth.js?v=dh10"></script>
+<script src="/js/digital-human.js?v=dh10"></script>
+<script src="/js/live-activity.js?v=dh10"></script>
+<script src="/js/game.js?v=dh10"></script>
 <script>
 // PWA service worker registration
 if ('serviceWorker' in navigator) {

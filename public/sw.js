@@ -1,7 +1,7 @@
 // A26 Service Worker - PWA offline support
 // Strategy: network-first for HTML/JS/CSS (so users always get latest),
 //           cache-first for images/icons (they rarely change).
-const CACHE_NAME = 'a26-v10-live-girl';
+const CACHE_NAME = 'a26-v11-live-activity';
 const PRECACHE_ASSETS = [
   '/',
   '/login.html',
@@ -10,6 +10,7 @@ const PRECACHE_ASSETS = [
   '/css/style.css',
   '/js/auth.js',
   '/js/digital-human.js',
+  '/js/live-activity.js',
   '/js/game.js',
   '/manifest.json',
   '/icons/icon-192.png',
